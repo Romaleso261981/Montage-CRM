@@ -12,6 +12,7 @@ import {
   where,
 } from 'firebase/firestore'
 import { db } from '../lib/firebase'
+import { removeUndefinedFields } from '../lib/firestoreSanitize'
 import type {
   CreateOrderInput,
   Order,
@@ -26,12 +27,13 @@ export async function createOrder(
   organizationId: string,
   data: CreateOrderPayload,
 ): Promise<string> {
-  const ref = await addDoc(collection(db, COLLECTION), {
+  const payload = removeUndefinedFields({
     organizationId,
     ...data,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   })
+  const ref = await addDoc(collection(db, COLLECTION), payload)
   return ref.id
 }
 
@@ -57,10 +59,13 @@ export async function updateOrder(
   orderId: string,
   data: UpdateOrderInput,
 ): Promise<void> {
-  await updateDoc(doc(db, COLLECTION, orderId), {
-    ...data,
-    updatedAt: serverTimestamp(),
-  })
+  await updateDoc(
+    doc(db, COLLECTION, orderId),
+    removeUndefinedFields({
+      ...data,
+      updatedAt: serverTimestamp(),
+    }),
+  )
 }
 
 export async function deleteOrder(orderId: string): Promise<void> {
