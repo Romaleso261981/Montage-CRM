@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   ORDER_STATUS_LABELS,
   PAYMENT_STATUS_LABELS,
@@ -13,6 +13,7 @@ import type { Order } from '../types/order'
 
 export function OrdersPage() {
   const { appUser } = useAuth()
+  const navigate = useNavigate()
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -49,7 +50,11 @@ export function OrdersPage() {
       )}
 
       {!loading && orders.length > 0 && (
-        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+        <>
+          <p className="text-sm text-slate-500">
+            Натисніть на рядок, щоб відкрити та редагувати заявку.
+          </p>
+          <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
           <table className="min-w-full text-left text-sm">
             <thead className="border-b border-slate-200 bg-slate-50 text-slate-600">
               <tr>
@@ -63,7 +68,20 @@ export function OrdersPage() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {orders.map((order) => (
-                <tr key={order.id} className="hover:bg-slate-50">
+                <tr
+                  key={order.id}
+                  className="cursor-pointer hover:bg-slate-100"
+                  onClick={() => navigate(`/orders/${order.id}`)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      navigate(`/orders/${order.id}`)
+                    }
+                  }}
+                  tabIndex={0}
+                  role="link"
+                  aria-label={`Заявка ${order.clientName}`}
+                >
                   <td className="px-4 py-3 font-medium">{order.clientName}</td>
                   <td className="px-4 py-3">{order.phone}</td>
                   <td className="px-4 py-3">
@@ -111,6 +129,7 @@ export function OrdersPage() {
             </tbody>
           </table>
         </div>
+        </>
       )}
     </div>
   )

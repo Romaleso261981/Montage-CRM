@@ -10,6 +10,7 @@ import { InstallationsPage } from './pages/InstallationsPage'
 import { NewOrderPage } from './pages/NewOrderPage'
 import { OnboardingPage } from './pages/OnboardingPage'
 import { OrganizationSettingsPage } from './pages/OrganizationSettingsPage'
+import { OrderDetailPage } from './pages/OrderDetailPage'
 import { OrdersPage } from './pages/OrdersPage'
 import { UsersSettingsPage } from './pages/UsersSettingsPage'
 import { LoginPage, RegisterPage } from './pages/authPages'
@@ -33,6 +34,7 @@ export default function App() {
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/orders" element={<OrdersPage />} />
           <Route path="/orders/new" element={<NewOrderPage />} />
+          <Route path="/orders/:orderId" element={<OrderDetailPage />} />
           <Route path="/installations" element={<InstallationsPage />} />
           <Route
             path="/settings/organization"

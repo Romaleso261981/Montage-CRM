@@ -1,3 +1,4 @@
+import { FirebaseError } from 'firebase/app'
 import {
   addDoc,
   collection,
@@ -10,13 +11,14 @@ import {
   serverTimestamp,
   updateDoc,
   where,
+  type FieldValue,
 } from 'firebase/firestore'
-import { FirebaseError } from 'firebase/app'
 import { db } from '../lib/firebase'
 import { removeUndefinedFields } from '../lib/firestoreSanitize'
 import type {
   CreateOrderInput,
   Order,
+  OrderSaleDetails,
   UpdateOrderInput,
 } from '../types/order'
 
@@ -83,9 +85,13 @@ export async function getOrderById(orderId: string): Promise<Order | null> {
   return { id: snap.id, ...snap.data() } as Order
 }
 
+export type OrderUpdatePayload = Omit<UpdateOrderInput, 'saleDetails'> & {
+  saleDetails?: OrderSaleDetails | FieldValue
+}
+
 export async function updateOrder(
   orderId: string,
-  data: UpdateOrderInput,
+  data: OrderUpdatePayload,
 ): Promise<void> {
   await updateDoc(doc(db, COLLECTION, orderId), {
     ...removeUndefinedFields(data),
