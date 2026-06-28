@@ -1,6 +1,10 @@
 import { type FormEvent, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { FormField, inputClass } from '../components/AuthShell'
+import {
+  AcBrandModelFields,
+  resolveAcBrandAndModel,
+} from '../components/AcBrandModelFields'
 import { useAuth } from '../context/useAuth'
 import { getFirestoreErrorMessage } from '../lib/firestoreErrors'
 import { uahFromUsd } from '../lib/orderPricing'
@@ -24,8 +28,10 @@ export function NewOrderPage() {
   const [address, setAddress] = useState('')
   const [salePrice, setSalePrice] = useState('')
   const [isMySale, setIsMySale] = useState(false)
-  const [acName, setAcName] = useState('')
-  const [acModel, setAcModel] = useState('')
+  const [brandSelection, setBrandSelection] = useState('')
+  const [customBrand, setCustomBrand] = useState('')
+  const [modelSelection, setModelSelection] = useState('')
+  const [customModel, setCustomModel] = useState('')
   const [productUrl, setProductUrl] = useState('')
   const [retailPrice, setRetailPrice] = useState('')
   const [wholesalePrice, setWholesalePrice] = useState('')
@@ -61,10 +67,18 @@ export function NewOrderPage() {
     let saleDetails: OrderSaleDetails | undefined
 
     if (isMySale) {
-      if (!acName.trim() || !acModel.trim()) {
-        setError('Вкажіть назву та модель кондиціонера')
+      const resolved = resolveAcBrandAndModel(
+        brandSelection,
+        customBrand,
+        modelSelection,
+        customModel,
+      )
+      if (!resolved) {
+        setError('Оберіть бренд і модель кондиціонера зі списку або вкажіть вручну')
         return
       }
+      const { acName, acModel } = resolved
+
       if (!supplierName.trim()) {
         setError('Вкажіть постачальника')
         return
@@ -212,26 +226,21 @@ export function NewOrderPage() {
         {isMySale && (
           <div className="space-y-4 rounded-lg border border-slate-200 p-4">
             <p className="text-sm font-medium text-slate-900">Дані про кондиціонер</p>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <FormField label="Назва кондиціонера *">
-                <input
-                  required={isMySale}
-                  className={inputClass}
-                  value={acName}
-                  onChange={(e) => setAcName(e.target.value)}
-                  placeholder="Напр. Gree, Daikin…"
-                />
-              </FormField>
-              <FormField label="Модель *">
-                <input
-                  required={isMySale}
-                  className={inputClass}
-                  value={acModel}
-                  onChange={(e) => setAcModel(e.target.value)}
-                  placeholder="Напр. GWH09AAA-K6DNA1A"
-                />
-              </FormField>
-            </div>
+            <AcBrandModelFields
+              required={isMySale}
+              brandSelection={brandSelection}
+              onBrandSelectionChange={(value) => {
+                setBrandSelection(value)
+                setModelSelection('')
+                setCustomModel('')
+              }}
+              customBrand={customBrand}
+              onCustomBrandChange={setCustomBrand}
+              modelSelection={modelSelection}
+              onModelSelectionChange={setModelSelection}
+              customModel={customModel}
+              onCustomModelChange={setCustomModel}
+            />
             <FormField label="Посилання на товар в інтернеті">
               <input
                 type="url"
