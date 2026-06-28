@@ -1,7 +1,7 @@
 import { type FormEvent, useEffect, useState } from 'react'
 import { FormField, inputClass } from '../components/AuthShell'
 import { canManageOrganization } from '../constants/userRoles'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../context/useAuth'
 import { updateOrganization } from '../services/organizationsService'
 
 export function OrganizationSettingsPage() {

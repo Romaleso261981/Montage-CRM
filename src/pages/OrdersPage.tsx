@@ -4,7 +4,7 @@ import {
   ORDER_STATUS_LABELS,
   PAYMENT_STATUS_LABELS,
 } from '../constants/orderLabels'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../context/useAuth'
 import { getOrdersByOrganizationId } from '../services/ordersService'
 import type { Order } from '../types/order'
 

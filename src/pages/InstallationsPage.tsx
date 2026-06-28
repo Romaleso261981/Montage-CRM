@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ORDER_STATUS_LABELS } from '../constants/orderLabels'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../context/useAuth'
 import { getInstallationsByOrganizationId } from '../services/ordersService'
 import type { Order } from '../types/order'
 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { USER_ROLE_LABELS } from '../constants/userRoles'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../context/useAuth'
 import { getUsersByOrganizationId } from '../services/usersService'
 import type { AppUser } from '../types/user'
 

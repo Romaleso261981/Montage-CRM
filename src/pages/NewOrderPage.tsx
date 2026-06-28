@@ -1,7 +1,7 @@
 import { type FormEvent, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { FormField, inputClass } from '../components/AuthShell'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../context/useAuth'
 import { createOrder } from '../services/ordersService'
 import type { OrderStatus, PaymentStatus } from '../types/order'
 

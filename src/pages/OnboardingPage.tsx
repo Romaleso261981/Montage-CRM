@@ -5,7 +5,7 @@ import {
   FormField,
   inputClass,
 } from '../components/AuthShell'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../context/useAuth'
 import { createOrganization } from '../services/organizationsService'
 import { createAppUser } from '../services/usersService'
 
