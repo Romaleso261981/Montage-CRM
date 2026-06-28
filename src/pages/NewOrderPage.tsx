@@ -2,8 +2,18 @@ import { type FormEvent, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { FormField, inputClass } from '../components/AuthShell'
 import { useAuth } from '../context/useAuth'
+import { getFirestoreErrorMessage } from '../lib/firestoreErrors'
+import { uahFromUsd } from '../lib/orderPricing'
 import { createOrder } from '../services/ordersService'
-import type { OrderStatus, PaymentStatus } from '../types/order'
+import type { OrderSaleDetails, OrderStatus, PaymentStatus } from '../types/order'
+
+function parseRequiredNumber(value: string): number | null {
+  const n = Number(value)
+  if (Number.isNaN(n) || n < 0) {
+    return null
+  }
+  return n
+}
 
 export function NewOrderPage() {
   const { appUser, firebaseUser } = useAuth()
@@ -13,20 +23,103 @@ export function NewOrderPage() {
   const [phone, setPhone] = useState('')
   const [address, setAddress] = useState('')
   const [salePrice, setSalePrice] = useState('')
+  const [isMySale, setIsMySale] = useState(false)
+  const [acName, setAcName] = useState('')
+  const [acModel, setAcModel] = useState('')
+  const [productUrl, setProductUrl] = useState('')
+  const [retailPrice, setRetailPrice] = useState('')
+  const [wholesalePrice, setWholesalePrice] = useState('')
+  const [supplierName, setSupplierName] = useState('')
+  const [supplierPaidInUsd, setSupplierPaidInUsd] = useState(true)
+  const [supplierPaidAmountUsd, setSupplierPaidAmountUsd] = useState('')
+  const [supplierUsdExchangeRate, setSupplierUsdExchangeRate] = useState('')
+  const [supplierPaidAmount, setSupplierPaidAmount] = useState('')
+  const [supplierPurchaseDate, setSupplierPurchaseDate] = useState('')
   const [status, setStatus] = useState<OrderStatus>('new')
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>('unpaid')
   const [comment, setComment] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
+  function applySupplierUahFromUsd(usdStr: string, rateStr: string) {
+    const usd = parseRequiredNumber(usdStr)
+    const rate = parseRequiredNumber(rateStr)
+    if (usd === null || rate === null || rate === 0) return
+    setSupplierPaidAmount(String(uahFromUsd(usd, rate)))
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (!appUser?.organizationId || !firebaseUser) return
 
-    const price = Number(salePrice)
-    if (Number.isNaN(price) || price < 0) {
-      setError('Вкажіть коректну суму')
+    const price = parseRequiredNumber(salePrice)
+    if (price === null) {
+      setError('Вкажіть коректну суму для клієнта (₴)')
       return
+    }
+
+    let saleDetails: OrderSaleDetails | undefined
+
+    if (isMySale) {
+      if (!acName.trim() || !acModel.trim()) {
+        setError('Вкажіть назву та модель кондиціонера')
+        return
+      }
+      if (!supplierName.trim()) {
+        setError('Вкажіть постачальника')
+        return
+      }
+      if (!supplierPurchaseDate) {
+        setError('Вкажіть дату закупівлі у постачальника')
+        return
+      }
+
+      const retail = parseRequiredNumber(retailPrice)
+      const wholesale = parseRequiredNumber(wholesalePrice)
+      if (retail === null || wholesale === null) {
+        setError('Перевірте роздрібну та оптову вартість')
+        return
+      }
+
+      let paidUah: number
+      let paidUsd: number | undefined
+      let paidRate: number | undefined
+
+      if (supplierPaidInUsd) {
+        const usd = parseRequiredNumber(supplierPaidAmountUsd)
+        const rate = parseRequiredNumber(supplierUsdExchangeRate)
+        if (usd === null || rate === null || rate === 0) {
+          setError('Вкажіть суму оплати постачальнику в USD і курс')
+          return
+        }
+        paidUsd = usd
+        paidRate = rate
+        paidUah = uahFromUsd(usd, rate)
+      } else {
+        const paid = parseRequiredNumber(supplierPaidAmount)
+        if (paid === null) {
+          setError('Вкажіть суму оплати постачальнику в гривнях')
+          return
+        }
+        paidUah = paid
+      }
+
+      saleDetails = {
+        acName: acName.trim(),
+        acModel: acModel.trim(),
+        productUrl: productUrl.trim() || undefined,
+        retailPrice: retail,
+        wholesalePrice: wholesale,
+        supplierName: supplierName.trim(),
+        supplierPaidAmount: paidUah,
+        ...(paidUsd != null && paidRate != null
+          ? {
+              supplierPaidAmountUsd: paidUsd,
+              supplierUsdExchangeRate: paidRate,
+            }
+          : {}),
+        supplierPurchaseDate,
+      }
     }
 
     setError(null)
@@ -38,20 +131,22 @@ export function NewOrderPage() {
         phone: phone.trim(),
         address: address.trim(),
         salePrice: price,
+        isMySale,
+        saleDetails: isMySale ? saleDetails : undefined,
         status,
         paymentStatus,
         comment: comment.trim() || undefined,
       })
       navigate('/orders')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Не вдалося створити заявку')
+      setError(getFirestoreErrorMessage(err))
     } finally {
       setSubmitting(false)
     }
   }
 
   return (
-    <div className="mx-auto max-w-xl space-y-6">
+    <div className="mx-auto max-w-2xl space-y-6">
       <div className="flex items-center justify-between gap-4">
         <h1 className="text-2xl font-semibold">Нова заявка</h1>
         <Link to="/orders" className="text-sm text-slate-600 hover:text-slate-900">
@@ -87,7 +182,7 @@ export function NewOrderPage() {
             onChange={(e) => setAddress(e.target.value)}
           />
         </FormField>
-        <FormField label="Сума продажу (₴) *">
+        <FormField label="Сума для клієнта (₴) *">
           <input
             required
             type="number"
@@ -98,6 +193,188 @@ export function NewOrderPage() {
             onChange={(e) => setSalePrice(e.target.value)}
           />
         </FormField>
+
+        <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+          <input
+            type="checkbox"
+            className="mt-0.5 size-4 rounded border-slate-300"
+            checked={isMySale}
+            onChange={(e) => setIsMySale(e.target.checked)}
+          />
+          <span>
+            <span className="text-sm font-medium text-slate-900">Моя продажа</span>
+            <span className="mt-0.5 block text-xs text-slate-500">
+              Клієнт купує кондиціонер у вас — модель, постачальник і собівартість
+            </span>
+          </span>
+        </label>
+
+        {isMySale && (
+          <div className="space-y-4 rounded-lg border border-slate-200 p-4">
+            <p className="text-sm font-medium text-slate-900">Дані про кондиціонер</p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormField label="Назва кондиціонера *">
+                <input
+                  required={isMySale}
+                  className={inputClass}
+                  value={acName}
+                  onChange={(e) => setAcName(e.target.value)}
+                  placeholder="Напр. Gree, Daikin…"
+                />
+              </FormField>
+              <FormField label="Модель *">
+                <input
+                  required={isMySale}
+                  className={inputClass}
+                  value={acModel}
+                  onChange={(e) => setAcModel(e.target.value)}
+                  placeholder="Напр. GWH09AAA-K6DNA1A"
+                />
+              </FormField>
+            </div>
+            <FormField label="Посилання на товар в інтернеті">
+              <input
+                type="url"
+                className={inputClass}
+                value={productUrl}
+                onChange={(e) => setProductUrl(e.target.value)}
+                placeholder="https://…"
+              />
+            </FormField>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormField label="Вартість роздрібна (₴) *">
+                <input
+                  required={isMySale}
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  className={inputClass}
+                  value={retailPrice}
+                  onChange={(e) => setRetailPrice(e.target.value)}
+                />
+              </FormField>
+              <FormField label="Вартість оптова (₴) *">
+                <input
+                  required={isMySale}
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  className={inputClass}
+                  value={wholesalePrice}
+                  onChange={(e) => setWholesalePrice(e.target.value)}
+                />
+              </FormField>
+            </div>
+
+            <p className="border-t border-slate-100 pt-4 text-sm font-medium text-slate-900">
+              Закупівля у постачальника
+            </p>
+            <FormField label="У кого купили (постачальник) *">
+              <input
+                required={isMySale}
+                className={inputClass}
+                value={supplierName}
+                onChange={(e) => setSupplierName(e.target.value)}
+              />
+            </FormField>
+            <FormField label="Дата закупівлі *">
+              <input
+                required={isMySale}
+                type="date"
+                className={inputClass}
+                value={supplierPurchaseDate}
+                onChange={(e) => setSupplierPurchaseDate(e.target.value)}
+              />
+            </FormField>
+
+            <label className="flex cursor-pointer items-start gap-3">
+              <input
+                type="checkbox"
+                className="mt-0.5 size-4 rounded border-slate-300"
+                checked={supplierPaidInUsd}
+                onChange={(e) => setSupplierPaidInUsd(e.target.checked)}
+              />
+              <span className="text-sm text-slate-700">
+                Платив постачальнику в доларах (USD)
+              </span>
+            </label>
+
+            {supplierPaidInUsd ? (
+              <>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <FormField label="Сума постачальнику ($) *">
+                    <input
+                      required={isMySale}
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      className={inputClass}
+                      value={supplierPaidAmountUsd}
+                      onChange={(e) => {
+                        setSupplierPaidAmountUsd(e.target.value)
+                        applySupplierUahFromUsd(
+                          e.target.value,
+                          supplierUsdExchangeRate,
+                        )
+                      }}
+                    />
+                  </FormField>
+                  <FormField label="Курс USD (₴ за 1 $) *">
+                    <input
+                      required={isMySale}
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      className={inputClass}
+                      value={supplierUsdExchangeRate}
+                      onChange={(e) => {
+                        setSupplierUsdExchangeRate(e.target.value)
+                        applySupplierUahFromUsd(
+                          supplierPaidAmountUsd,
+                          e.target.value,
+                        )
+                      }}
+                      placeholder="Напр. 41.50"
+                    />
+                  </FormField>
+                </div>
+                <FormField label="Собівартість закупівлі (₴) — розрахунок">
+                  <input
+                    readOnly
+                    className={`${inputClass} bg-slate-50`}
+                    value={supplierPaidAmount}
+                    placeholder="USD × курс"
+                  />
+                </FormField>
+                <button
+                  type="button"
+                  className="text-sm font-medium text-slate-700 underline-offset-2 hover:underline"
+                  onClick={() =>
+                    applySupplierUahFromUsd(
+                      supplierPaidAmountUsd,
+                      supplierUsdExchangeRate,
+                    )
+                  }
+                >
+                  Перерахувати ₴
+                </button>
+              </>
+            ) : (
+              <FormField label="Скільки заплатили постачальнику (₴) *">
+                <input
+                  required={isMySale}
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  className={inputClass}
+                  value={supplierPaidAmount}
+                  onChange={(e) => setSupplierPaidAmount(e.target.value)}
+                />
+              </FormField>
+            )}
+          </div>
+        )}
+
         <FormField label="Статус">
           <select
             className={inputClass}

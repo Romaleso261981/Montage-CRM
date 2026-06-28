@@ -6,6 +6,7 @@ import {
 } from '../constants/orderLabels'
 import { useAuth } from '../context/useAuth'
 import { getOrdersByOrganizationId } from '../services/ordersService'
+import { formatSupplierPurchaseCost } from '../lib/orderPricing'
 import type { Order } from '../types/order'
 
 export function OrdersPage() {
@@ -54,6 +55,7 @@ export function OrdersPage() {
                 <th className="px-4 py-3 font-medium">Телефон</th>
                 <th className="px-4 py-3 font-medium">Статус</th>
                 <th className="px-4 py-3 font-medium">Оплата</th>
+                <th className="px-4 py-3 font-medium">Продаж</th>
                 <th className="px-4 py-3 font-medium">Сума</th>
               </tr>
             </thead>
@@ -67,6 +69,21 @@ export function OrdersPage() {
                   </td>
                   <td className="px-4 py-3">
                     {PAYMENT_STATUS_LABELS[order.paymentStatus]}
+                  </td>
+                  <td className="px-4 py-3 text-slate-600">
+                    {order.isMySale && order.saleDetails ? (
+                      <span
+                        title={formatSupplierPurchaseCost(order.saleDetails)}
+                      >
+                        Моя · {order.saleDetails.acModel}
+                        <span className="mt-0.5 block text-xs text-slate-400">
+                          {order.saleDetails.supplierName}:{' '}
+                          {formatSupplierPurchaseCost(order.saleDetails)}
+                        </span>
+                      </span>
+                    ) : (
+                      '—'
+                    )}
                   </td>
                   <td className="px-4 py-3">{order.salePrice} ₴</td>
                 </tr>

@@ -10,6 +10,24 @@ export type OrderStatus =
 
 export type PaymentStatus = 'unpaid' | 'partial' | 'paid'
 
+/** Дані про продаж кондиціонера (коли увімкнено «Моя продажа»). */
+export type OrderSaleDetails = {
+  acName: string
+  acModel: string
+  productUrl?: string
+  retailPrice: number
+  wholesalePrice: number
+  supplierName: string
+  /** Скільки заплатили постачальнику в гривнях (фактична собівартість). */
+  supplierPaidAmount: number
+  /** Оплата постачальнику в USD (якщо платили в доларах). */
+  supplierPaidAmountUsd?: number
+  /** Курс USD → UAH на момент оплати постачальнику. */
+  supplierUsdExchangeRate?: number
+  /** Дата закупівлі у постачальника (YYYY-MM-DD). */
+  supplierPurchaseDate: string
+}
+
 export type Order = {
   id: string
   organizationId: string
@@ -18,7 +36,12 @@ export type Order = {
   clientName: string
   phone: string
   address: string
+  /** Сума для клієнта в гривнях. */
   salePrice: number
+
+  /** Продаж обладнання через вашу компанію. */
+  isMySale: boolean
+  saleDetails?: OrderSaleDetails
 
   status: OrderStatus
   installationDate?: string

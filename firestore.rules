@@ -3,8 +3,6 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- Production rules (multi-tenant by organizationId) ---
-
     function isSignedIn() {
       return request.auth != null;
     }
@@ -35,9 +33,11 @@ service cloud.firestore {
         (hasUserProfile() && resource.data.organizationId == userOrganizationId())
       );
 
+      // First-time onboarding: owner creates their profile after creating the org.
       allow create: if isSignedIn()
         && request.auth.uid == userId
-        && request.resource.data.keys().hasAll(['email', 'organizationId', 'role', 'createdAt', 'updatedAt'])
+        && request.resource.data.email is string
+        && request.resource.data.organizationId is string
         && request.resource.data.role == 'owner'
         && get(/databases/$(database)/documents/organizations/$(request.resource.data.organizationId)).data.ownerId == request.auth.uid;
 
@@ -47,11 +47,13 @@ service cloud.firestore {
     }
 
     match /organizations/{organizationId} {
-      allow read: if sameOrganization(organizationId);
+      allow read: if sameOrganization(organizationId)
+        || (isSignedIn() && resource.data.ownerId == request.auth.uid);
 
       allow create: if isSignedIn()
         && request.resource.data.ownerId == request.auth.uid
-        && request.resource.data.keys().hasAll(['name', 'ownerId', 'createdAt', 'updatedAt']);
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0;
 
       allow update: if sameOrganization(organizationId) && isOwnerOrAdmin();
 
@@ -72,7 +74,8 @@ service cloud.firestore {
       allow read: if hasUserProfile()
         && resource.data.organizationId == userOrganizationId();
 
-      allow create, update, delete: if sameOrganization(request.resource.data.organizationId)
+      allow create, update, delete: if hasUserProfile()
+        && request.resource.data.organizationId == userOrganizationId()
         && isOwnerOrAdmin();
     }
   }

@@ -6,11 +6,12 @@ import {
   inputClass,
 } from '../components/AuthShell'
 import { useAuth } from '../context/useAuth'
+import { getFirestoreErrorMessage } from '../lib/firestoreErrors'
 import { createOrganization } from '../services/organizationsService'
 import { createAppUser } from '../services/usersService'
 
 export function OnboardingPage() {
-  const { firebaseUser, refreshProfile } = useAuth()
+  const { firebaseUser, refreshProfile, logout } = useAuth()
   const navigate = useNavigate()
 
   const [orgName, setOrgName] = useState('')
@@ -20,6 +21,20 @@ export function OnboardingPage() {
   const [ownerName, setOwnerName] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [signingIn, setSigningIn] = useState(false)
+
+  async function handleGoToLogin() {
+    setSigningIn(true)
+    setError(null)
+    try {
+      await logout()
+      navigate('/login', { replace: true })
+    } catch (err) {
+      setError(getFirestoreErrorMessage(err))
+    } finally {
+      setSigningIn(false)
+    }
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -47,9 +62,7 @@ export function OnboardingPage() {
       await refreshProfile()
       navigate('/dashboard', { replace: true })
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'Не вдалося створити організацію',
-      )
+      setError(getFirestoreErrorMessage(err))
     } finally {
       setSubmitting(false)
     }
@@ -109,15 +122,27 @@ export function OnboardingPage() {
         )}
         <button
           type="submit"
-          disabled={submitting}
+          disabled={submitting || signingIn}
           className="w-full rounded-lg bg-slate-900 py-2.5 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
         >
           {submitting ? 'Створення…' : 'Створити організацію'}
         </button>
+        <button
+          type="button"
+          disabled={submitting || signingIn}
+          onClick={() => void handleGoToLogin()}
+          className="w-full rounded-lg border border-slate-300 bg-white py-2.5 text-sm font-medium text-slate-900 hover:bg-slate-50 disabled:opacity-60"
+        >
+          {signingIn ? 'Перехід…' : 'Увійти (організація вже створена)'}
+        </button>
       </form>
       <p className="mt-4 text-xs text-slate-500">
-        Приєднання до існуючої організації через інвайт буде доступне пізніше
-        (колекція <code className="rounded bg-slate-100 px-1">organizationInvites</code>
+        Якщо компанію вже створено раніше, натисніть «Увійти» і авторизуйтеся тим
+        email, під яким реєстрували організацію.
+      </p>
+      <p className="mt-2 text-xs text-slate-500">
+        Запрошення в існуючу організацію з’явиться пізніше (колекція{' '}
+        <code className="rounded bg-slate-100 px-1">organizationInvites</code>
         ).
       </p>
     </AuthShell>
