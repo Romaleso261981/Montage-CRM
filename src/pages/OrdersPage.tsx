@@ -6,6 +6,7 @@ import {
 } from '../constants/orderLabels'
 import { useAuth } from '../context/useAuth'
 import { getOrdersByOrganizationId } from '../services/ordersService'
+import { getFirestoreErrorMessage } from '../lib/firestoreErrors'
 import { formatSupplierPurchaseCost } from '../lib/orderPricing'
 import { formatMoneyDisplay } from '../lib/moneyFormat'
 import type { Order } from '../types/order'
@@ -20,7 +21,7 @@ export function OrdersPage() {
     if (!appUser?.organizationId) return
     void getOrdersByOrganizationId(appUser.organizationId)
       .then(setOrders)
-      .catch(() => setError('Не вдалося завантажити заявки'))
+      .catch((err) => setError(getFirestoreErrorMessage(err)))
       .finally(() => setLoading(false))
   }, [appUser?.organizationId])
 

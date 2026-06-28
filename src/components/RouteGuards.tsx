@@ -20,6 +20,10 @@ export function ProtectedRoute() {
     return <Navigate to="/onboarding" replace />
   }
 
+  if (!appUser.organizationId) {
+    return <Navigate to="/onboarding" replace />
+  }
+
   return <Outlet />
 }
 

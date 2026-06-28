@@ -60,14 +60,29 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    function canAccessOrganization(organizationId) {
+      return hasUserProfile() && userOrganizationId() == organizationId;
+    }
+
+    function isOrganizationOwner(organizationId) {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/organizations/$(organizationId))
+        && get(/databases/$(database)/documents/organizations/$(organizationId)).data.ownerId == request.auth.uid;
+    }
+
+    function canWriteOrganizationData(organizationId) {
+      return canAccessOrganization(organizationId) || isOrganizationOwner(organizationId);
+    }
+
     match /orders/{orderId} {
-      allow read: if sameOrganization(resource.data.organizationId);
+      allow read: if canWriteOrganizationData(resource.data.organizationId);
 
-      allow create: if hasUserProfile()
-        && request.resource.data.organizationId == userOrganizationId()
-        && request.resource.data.createdBy == request.auth.uid;
+      allow create: if isSignedIn()
+        && request.resource.data.organizationId is string
+        && request.resource.data.createdBy == request.auth.uid
+        && canWriteOrganizationData(request.resource.data.organizationId);
 
-      allow update, delete: if sameOrganization(resource.data.organizationId);
+      allow update, delete: if canWriteOrganizationData(resource.data.organizationId);
     }
 
     match /organizationInvites/{inviteId} {

@@ -11,6 +11,7 @@ import {
   updateDoc,
   where,
 } from 'firebase/firestore'
+import { FirebaseError } from 'firebase/app'
 import { db } from '../lib/firebase'
 import { removeUndefinedFields } from '../lib/firestoreSanitize'
 import type {
@@ -21,32 +22,59 @@ import type {
 
 const COLLECTION = 'orders'
 
+function mapOrderDocs(docs: { id: string; data: () => unknown }[]): Order[] {
+  return docs.map((d) => ({ id: d.id, ...(d.data() as object) }) as Order)
+}
+
+function sortOrdersByCreatedAtDesc(orders: Order[]): Order[] {
+  return [...orders].sort((a, b) => {
+    const ta = a.createdAt?.toMillis?.() ?? 0
+    const tb = b.createdAt?.toMillis?.() ?? 0
+    return tb - ta
+  })
+}
+
 export type CreateOrderPayload = CreateOrderInput & { createdBy: string }
 
 export async function createOrder(
   organizationId: string,
   data: CreateOrderPayload,
 ): Promise<string> {
-  const payload = removeUndefinedFields({
-    organizationId,
-    ...data,
+  if (!organizationId?.trim()) {
+    throw new Error('organizationId is required')
+  }
+  if (!data.createdBy?.trim()) {
+    throw new Error('createdBy is required')
+  }
+
+  const ref = await addDoc(collection(db, COLLECTION), {
+    ...removeUndefinedFields({
+      organizationId: organizationId.trim(),
+      ...data,
+    }),
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   })
-  const ref = await addDoc(collection(db, COLLECTION), payload)
   return ref.id
 }
 
 export async function getOrdersByOrganizationId(
   organizationId: string,
 ): Promise<Order[]> {
-  const q = query(
-    collection(db, COLLECTION),
-    where('organizationId', '==', organizationId),
-    orderBy('createdAt', 'desc'),
-  )
-  const snap = await getDocs(q)
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Order)
+  const base = collection(db, COLLECTION)
+  const filtered = query(base, where('organizationId', '==', organizationId))
+
+  try {
+    const q = query(filtered, orderBy('createdAt', 'desc'))
+    const snap = await getDocs(q)
+    return mapOrderDocs(snap.docs)
+  } catch (err) {
+    if (err instanceof FirebaseError && err.code === 'failed-precondition') {
+      const snap = await getDocs(filtered)
+      return sortOrdersByCreatedAtDesc(mapOrderDocs(snap.docs))
+    }
+    throw err
+  }
 }
 
 export async function getOrderById(orderId: string): Promise<Order | null> {
@@ -59,13 +87,10 @@ export async function updateOrder(
   orderId: string,
   data: UpdateOrderInput,
 ): Promise<void> {
-  await updateDoc(
-    doc(db, COLLECTION, orderId),
-    removeUndefinedFields({
-      ...data,
-      updatedAt: serverTimestamp(),
-    }),
-  )
+  await updateDoc(doc(db, COLLECTION, orderId), {
+    ...removeUndefinedFields(data),
+    updatedAt: serverTimestamp(),
+  })
 }
 
 export async function deleteOrder(orderId: string): Promise<void> {
