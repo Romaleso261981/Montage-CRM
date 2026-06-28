@@ -7,6 +7,7 @@ import {
 import { useAuth } from '../context/useAuth'
 import { getOrdersByOrganizationId } from '../services/ordersService'
 import { formatSupplierPurchaseCost } from '../lib/orderPricing'
+import { formatMoneyDisplay } from '../lib/moneyFormat'
 import type { Order } from '../types/order'
 
 export function OrdersPage() {
@@ -85,7 +86,9 @@ export function OrdersPage() {
                       '—'
                     )}
                   </td>
-                  <td className="px-4 py-3">{order.salePrice} ₴</td>
+                  <td className="px-4 py-3">
+                    {formatMoneyDisplay(order.salePrice, 'UAH')}
+                  </td>
                 </tr>
               ))}
             </tbody>

@@ -6,17 +6,15 @@ import {
   resolveAcBrandAndModel,
 } from '../components/AcBrandModelFields'
 import { useAuth } from '../context/useAuth'
+import { MoneyInput } from '../components/MoneyInput'
 import { getFirestoreErrorMessage } from '../lib/firestoreErrors'
+import { normalizeMoneyInput, parseMoneyInput } from '../lib/moneyFormat'
 import { uahFromUsd } from '../lib/orderPricing'
 import { createOrder } from '../services/ordersService'
 import type { OrderSaleDetails, OrderStatus, PaymentStatus } from '../types/order'
 
-function parseRequiredNumber(value: string): number | null {
-  const n = Number(value)
-  if (Number.isNaN(n) || n < 0) {
-    return null
-  }
-  return n
+function parseRequiredMoney(value: string): number | null {
+  return parseMoneyInput(value)
 }
 
 export function NewOrderPage() {
@@ -48,17 +46,17 @@ export function NewOrderPage() {
   const [submitting, setSubmitting] = useState(false)
 
   function applySupplierUahFromUsd(usdStr: string, rateStr: string) {
-    const usd = parseRequiredNumber(usdStr)
-    const rate = parseRequiredNumber(rateStr)
+    const usd = parseMoneyInput(usdStr)
+    const rate = parseMoneyInput(rateStr)
     if (usd === null || rate === null || rate === 0) return
-    setSupplierPaidAmount(String(uahFromUsd(usd, rate)))
+    setSupplierPaidAmount(normalizeMoneyInput(String(uahFromUsd(usd, rate))))
   }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (!appUser?.organizationId || !firebaseUser) return
 
-    const price = parseRequiredNumber(salePrice)
+    const price = parseRequiredMoney(salePrice)
     if (price === null) {
       setError('Вкажіть коректну суму для клієнта (₴)')
       return
@@ -88,8 +86,8 @@ export function NewOrderPage() {
         return
       }
 
-      const retail = parseRequiredNumber(retailPrice)
-      const wholesale = parseRequiredNumber(wholesalePrice)
+      const retail = parseRequiredMoney(retailPrice)
+      const wholesale = parseRequiredMoney(wholesalePrice)
       if (retail === null || wholesale === null) {
         setError('Перевірте роздрібну та оптову вартість')
         return
@@ -100,8 +98,8 @@ export function NewOrderPage() {
       let paidRate: number | undefined
 
       if (supplierPaidInUsd) {
-        const usd = parseRequiredNumber(supplierPaidAmountUsd)
-        const rate = parseRequiredNumber(supplierUsdExchangeRate)
+        const usd = parseRequiredMoney(supplierPaidAmountUsd)
+        const rate = parseRequiredMoney(supplierUsdExchangeRate)
         if (usd === null || rate === null || rate === 0) {
           setError('Вкажіть суму оплати постачальнику в USD і курс')
           return
@@ -110,7 +108,7 @@ export function NewOrderPage() {
         paidRate = rate
         paidUah = uahFromUsd(usd, rate)
       } else {
-        const paid = parseRequiredNumber(supplierPaidAmount)
+        const paid = parseRequiredMoney(supplierPaidAmount)
         if (paid === null) {
           setError('Вкажіть суму оплати постачальнику в гривнях')
           return
@@ -196,15 +194,12 @@ export function NewOrderPage() {
             onChange={(e) => setAddress(e.target.value)}
           />
         </FormField>
-        <FormField label="Сума для клієнта (₴) *">
-          <input
+        <FormField label="Сума для клієнта *">
+          <MoneyInput
             required
-            type="number"
-            min={0}
-            step="0.01"
-            className={inputClass}
+            currency="UAH"
             value={salePrice}
-            onChange={(e) => setSalePrice(e.target.value)}
+            onChange={setSalePrice}
           />
         </FormField>
 
@@ -251,26 +246,20 @@ export function NewOrderPage() {
               />
             </FormField>
             <div className="grid gap-4 sm:grid-cols-2">
-              <FormField label="Вартість роздрібна (₴) *">
-                <input
+              <FormField label="Вартість роздрібна *">
+                <MoneyInput
                   required={isMySale}
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  className={inputClass}
+                  currency="UAH"
                   value={retailPrice}
-                  onChange={(e) => setRetailPrice(e.target.value)}
+                  onChange={setRetailPrice}
                 />
               </FormField>
-              <FormField label="Вартість оптова (₴) *">
-                <input
+              <FormField label="Вартість оптова *">
+                <MoneyInput
                   required={isMySale}
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  className={inputClass}
+                  currency="UAH"
                   value={wholesalePrice}
-                  onChange={(e) => setWholesalePrice(e.target.value)}
+                  onChange={setWholesalePrice}
                 />
               </FormField>
             </div>
@@ -311,47 +300,36 @@ export function NewOrderPage() {
             {supplierPaidInUsd ? (
               <>
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <FormField label="Сума постачальнику ($) *">
-                    <input
+                  <FormField label="Сума постачальнику *">
+                    <MoneyInput
                       required={isMySale}
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      className={inputClass}
+                      currency="USD"
                       value={supplierPaidAmountUsd}
-                      onChange={(e) => {
-                        setSupplierPaidAmountUsd(e.target.value)
-                        applySupplierUahFromUsd(
-                          e.target.value,
-                          supplierUsdExchangeRate,
-                        )
+                      onChange={(value) => {
+                        setSupplierPaidAmountUsd(value)
+                        applySupplierUahFromUsd(value, supplierUsdExchangeRate)
                       }}
                     />
                   </FormField>
-                  <FormField label="Курс USD (₴ за 1 $) *">
-                    <input
+                  <FormField label="Курс (₴ за 1 $) *">
+                    <MoneyInput
                       required={isMySale}
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      className={inputClass}
+                      currency="UAH"
                       value={supplierUsdExchangeRate}
-                      onChange={(e) => {
-                        setSupplierUsdExchangeRate(e.target.value)
-                        applySupplierUahFromUsd(
-                          supplierPaidAmountUsd,
-                          e.target.value,
-                        )
+                      onChange={(value) => {
+                        setSupplierUsdExchangeRate(value)
+                        applySupplierUahFromUsd(supplierPaidAmountUsd, value)
                       }}
-                      placeholder="Напр. 41.50"
+                      placeholder="41,50"
                     />
                   </FormField>
                 </div>
-                <FormField label="Собівартість закупівлі (₴) — розрахунок">
-                  <input
+                <FormField label="Собівартість закупівлі — розрахунок">
+                  <MoneyInput
                     readOnly
-                    className={`${inputClass} bg-slate-50`}
+                    currency="UAH"
                     value={supplierPaidAmount}
+                    onChange={() => {}}
                     placeholder="USD × курс"
                   />
                 </FormField>
@@ -369,15 +347,12 @@ export function NewOrderPage() {
                 </button>
               </>
             ) : (
-              <FormField label="Скільки заплатили постачальнику (₴) *">
-                <input
+              <FormField label="Скільки заплатили постачальнику *">
+                <MoneyInput
                   required={isMySale}
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  className={inputClass}
+                  currency="UAH"
                   value={supplierPaidAmount}
-                  onChange={(e) => setSupplierPaidAmount(e.target.value)}
+                  onChange={setSupplierPaidAmount}
                 />
               </FormField>
             )}
