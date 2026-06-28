@@ -36,7 +36,11 @@ export type Order = {
   clientName: string
   phone: string
   address: string
-  /** Сума для клієнта в гривнях. */
+  /** Вартість кондиціонера для клієнта (₴). */
+  acUnitPrice?: number
+  /** Вартість встановлення для клієнта (₴). */
+  installationPrice?: number
+  /** Загальна сума для клієнта в гривнях. */
   salePrice: number
 
   /** Продаж обладнання через вашу компанію. */

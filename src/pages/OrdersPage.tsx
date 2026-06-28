@@ -87,7 +87,23 @@ export function OrdersPage() {
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    {formatMoneyDisplay(order.salePrice, 'UAH')}
+                    <span
+                      title={
+                        order.acUnitPrice != null &&
+                        order.installationPrice != null
+                          ? `Кондиціонер: ${formatMoneyDisplay(order.acUnitPrice, 'UAH')}, встановлення: ${formatMoneyDisplay(order.installationPrice, 'UAH')}`
+                          : undefined
+                      }
+                    >
+                      {formatMoneyDisplay(order.salePrice, 'UAH')}
+                      {order.acUnitPrice != null &&
+                        order.installationPrice != null && (
+                          <span className="mt-0.5 block text-xs text-slate-400">
+                            {formatMoneyDisplay(order.acUnitPrice, 'UAH')} +{' '}
+                            {formatMoneyDisplay(order.installationPrice, 'UAH')}
+                          </span>
+                        )}
+                    </span>
                   </td>
                 </tr>
               ))}

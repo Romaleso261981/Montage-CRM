@@ -24,6 +24,8 @@ export function NewOrderPage() {
   const [clientName, setClientName] = useState('')
   const [phone, setPhone] = useState('')
   const [address, setAddress] = useState('')
+  const [acUnitPrice, setAcUnitPrice] = useState('')
+  const [installationPrice, setInstallationPrice] = useState('')
   const [salePrice, setSalePrice] = useState('')
   const [isMySale, setIsMySale] = useState(false)
   const [brandSelection, setBrandSelection] = useState('')
@@ -52,13 +54,42 @@ export function NewOrderPage() {
     setSupplierPaidAmount(normalizeMoneyInput(String(uahFromUsd(usd, rate))))
   }
 
+  function applyClientTotal(acStr: string, installStr: string) {
+    const ac = parseMoneyInput(acStr)
+    const install = parseMoneyInput(installStr)
+    if (ac === null && install === null) {
+      setSalePrice('')
+      return
+    }
+    const total = (ac ?? 0) + (install ?? 0)
+    setSalePrice(normalizeMoneyInput(String(total)))
+  }
+
+  function handleAcUnitPriceChange(value: string) {
+    setAcUnitPrice(value)
+    applyClientTotal(value, installationPrice)
+  }
+
+  function handleInstallationPriceChange(value: string) {
+    setInstallationPrice(value)
+    applyClientTotal(acUnitPrice, value)
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (!appUser?.organizationId || !firebaseUser) return
 
+    const ac = parseRequiredMoney(acUnitPrice)
+    const install = parseRequiredMoney(installationPrice)
+    if (ac === null || install === null) {
+      setError('Вкажіть вартість кондиціонера та встановлення')
+      return
+    }
+
     const price = parseRequiredMoney(salePrice)
-    if (price === null) {
-      setError('Вкажіть коректну суму для клієнта (₴)')
+    const expectedTotal = Math.round((ac + install) * 100) / 100
+    if (price === null || Math.abs(price - expectedTotal) > 0.02) {
+      setError('Загальна сума має дорівнювати вартості кондиціонера + встановлення')
       return
     }
 
@@ -142,7 +173,9 @@ export function NewOrderPage() {
         clientName: clientName.trim(),
         phone: phone.trim(),
         address: address.trim(),
-        salePrice: price,
+        acUnitPrice: ac,
+        installationPrice: install,
+        salePrice: expectedTotal,
         isMySale,
         saleDetails: isMySale ? saleDetails : undefined,
         status,
@@ -194,14 +227,37 @@ export function NewOrderPage() {
             onChange={(e) => setAddress(e.target.value)}
           />
         </FormField>
-        <FormField label="Сума для клієнта *">
-          <MoneyInput
-            required
-            currency="UAH"
-            value={salePrice}
-            onChange={setSalePrice}
-          />
-        </FormField>
+        <div className="space-y-4 rounded-lg border border-slate-200 p-4">
+          <p className="text-sm font-medium text-slate-900">Оплата від клієнта</p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <FormField label="Вартість кондиціонера *">
+              <MoneyInput
+                required
+                currency="UAH"
+                value={acUnitPrice}
+                onChange={handleAcUnitPriceChange}
+              />
+            </FormField>
+            <FormField label="Вартість встановлення *">
+              <MoneyInput
+                required
+                currency="UAH"
+                value={installationPrice}
+                onChange={handleInstallationPriceChange}
+              />
+            </FormField>
+          </div>
+          <FormField label="Загальна сума для клієнта *">
+            <MoneyInput
+              required
+              readOnly
+              currency="UAH"
+              value={salePrice}
+              onChange={() => {}}
+              placeholder="кондиціонер + встановлення"
+            />
+          </FormField>
+        </div>
 
         <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
           <input
