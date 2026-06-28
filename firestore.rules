@@ -1,0 +1,79 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --- Production rules (multi-tenant by organizationId) ---
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function hasUserProfile() {
+      return isSignedIn() && userDoc().exists();
+    }
+
+    function userOrganizationId() {
+      return userDoc().data.organizationId;
+    }
+
+    function sameOrganization(organizationId) {
+      return hasUserProfile() && userOrganizationId() == organizationId;
+    }
+
+    function isOwnerOrAdmin() {
+      return hasUserProfile() && userDoc().data.role in ['owner', 'admin'];
+    }
+
+    match /users/{userId} {
+      allow read: if isSignedIn() && (
+        request.auth.uid == userId ||
+        (hasUserProfile() && resource.data.organizationId == userOrganizationId())
+      );
+
+      allow create: if isSignedIn()
+        && request.auth.uid == userId
+        && request.resource.data.keys().hasAll(['email', 'organizationId', 'role', 'createdAt', 'updatedAt'])
+        && request.resource.data.role == 'owner'
+        && get(/databases/$(database)/documents/organizations/$(request.resource.data.organizationId)).data.ownerId == request.auth.uid;
+
+      allow update: if isSignedIn() && request.auth.uid == userId;
+
+      allow delete: if false;
+    }
+
+    match /organizations/{organizationId} {
+      allow read: if sameOrganization(organizationId);
+
+      allow create: if isSignedIn()
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.keys().hasAll(['name', 'ownerId', 'createdAt', 'updatedAt']);
+
+      allow update: if sameOrganization(organizationId) && isOwnerOrAdmin();
+
+      allow delete: if false;
+    }
+
+    match /orders/{orderId} {
+      allow read: if sameOrganization(resource.data.organizationId);
+
+      allow create: if hasUserProfile()
+        && request.resource.data.organizationId == userOrganizationId()
+        && request.resource.data.createdBy == request.auth.uid;
+
+      allow update, delete: if sameOrganization(resource.data.organizationId);
+    }
+
+    match /organizationInvites/{inviteId} {
+      allow read: if hasUserProfile()
+        && resource.data.organizationId == userOrganizationId();
+
+      allow create, update, delete: if sameOrganization(request.resource.data.organizationId)
+        && isOwnerOrAdmin();
+    }
+  }
+}
