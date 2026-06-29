@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import {
-  ORDER_STATUS_LABELS,
-  PAYMENT_STATUS_LABELS,
-} from '../constants/orderLabels'
+import { ORDER_STATUS_LABELS, PAYMENT_STATUS_LABELS } from '../constants/orderLabels'
 import { useAuth } from '../context/useAuth'
 import { getOrdersByOrganizationId } from '../services/ordersService'
 import { getFirestoreErrorMessage } from '../lib/firestoreErrors'
-import { formatSupplierPurchaseCost } from '../lib/orderPricing'
 import { formatMoneyDisplay } from '../lib/moneyFormat'
+import {
+  formatClientAmountDue,
+  formatInstallationSchedule,
+} from '../lib/orderDisplay'
 import type { Order } from '../types/order'
 
 export function OrdersPage() {
@@ -55,80 +55,87 @@ export function OrdersPage() {
             Натисніть на рядок, щоб відкрити та редагувати заявку.
           </p>
           <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-          <table className="min-w-full text-left text-sm">
-            <thead className="border-b border-slate-200 bg-slate-50 text-slate-600">
-              <tr>
-                <th className="px-4 py-3 font-medium">Клієнт</th>
-                <th className="px-4 py-3 font-medium">Телефон</th>
-                <th className="px-4 py-3 font-medium">Статус</th>
-                <th className="px-4 py-3 font-medium">Оплата</th>
-                <th className="px-4 py-3 font-medium">Продаж</th>
-                <th className="px-4 py-3 font-medium">Сума</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {orders.map((order) => (
-                <tr
-                  key={order.id}
-                  className="cursor-pointer hover:bg-slate-100"
-                  onClick={() => navigate(`/orders/${order.id}`)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault()
-                      navigate(`/orders/${order.id}`)
-                    }
-                  }}
-                  tabIndex={0}
-                  role="link"
-                  aria-label={`Заявка ${order.clientName}`}
-                >
-                  <td className="px-4 py-3 font-medium">{order.clientName}</td>
-                  <td className="px-4 py-3">{order.phone}</td>
-                  <td className="px-4 py-3">
-                    {ORDER_STATUS_LABELS[order.status]}
-                  </td>
-                  <td className="px-4 py-3">
-                    {PAYMENT_STATUS_LABELS[order.paymentStatus]}
-                  </td>
-                  <td className="px-4 py-3 text-slate-600">
-                    {order.isMySale && order.saleDetails ? (
-                      <span
-                        title={formatSupplierPurchaseCost(order.saleDetails)}
-                      >
-                        Моя · {order.saleDetails.acModel}
-                        <span className="mt-0.5 block text-xs text-slate-400">
-                          {order.saleDetails.supplierName}:{' '}
-                          {formatSupplierPurchaseCost(order.saleDetails)}
-                        </span>
-                      </span>
-                    ) : (
-                      '—'
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span
-                      title={
-                        order.acUnitPrice != null &&
-                        order.installationPrice != null
-                          ? `Кондиціонер: ${formatMoneyDisplay(order.acUnitPrice, 'UAH')}, встановлення: ${formatMoneyDisplay(order.installationPrice, 'UAH')}`
-                          : undefined
-                      }
-                    >
-                      {formatMoneyDisplay(order.salePrice, 'UAH')}
-                      {order.acUnitPrice != null &&
-                        order.installationPrice != null && (
-                          <span className="mt-0.5 block text-xs text-slate-400">
-                            {formatMoneyDisplay(order.acUnitPrice, 'UAH')} +{' '}
-                            {formatMoneyDisplay(order.installationPrice, 'UAH')}
-                          </span>
-                        )}
-                    </span>
-                  </td>
+            <table className="min-w-full text-left text-sm">
+              <thead className="border-b border-slate-200 bg-slate-50 text-slate-600">
+                <tr>
+                  <th className="px-4 py-3 font-medium">Клієнт</th>
+                  <th className="px-4 py-3 font-medium">Телефон</th>
+                  <th className="px-4 py-3 font-medium">Монтаж</th>
+                  <th className="px-4 py-3 font-medium">До сплати з клієнта</th>
+                  <th className="px-4 py-3 font-medium">Статус</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {orders.map((order) => (
+                  <tr
+                    key={order.id}
+                    className="cursor-pointer hover:bg-slate-100"
+                    onClick={() => navigate(`/orders/${order.id}`)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        navigate(`/orders/${order.id}`)
+                      }
+                    }}
+                    tabIndex={0}
+                    role="link"
+                    aria-label={`Заявка ${order.clientName}`}
+                  >
+                    <td className="px-4 py-3">
+                      <p className="font-medium text-slate-900">
+                        {order.clientName}
+                      </p>
+                      <p className="mt-0.5 text-xs leading-snug text-slate-500">
+                        {order.address?.trim() || '—'}
+                      </p>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <a
+                        href={`tel:${order.phone.replace(/\s/g, '')}`}
+                        className="text-slate-800 underline-offset-2 hover:underline"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {order.phone}
+                      </a>
+                    </td>
+                    <td className="px-4 py-3">
+                      <p>{formatInstallationSchedule(order)}</p>
+                      {order.installerName?.trim() && (
+                        <p className="mt-0.5 text-xs text-slate-400">
+                          {order.installerName}
+                        </p>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <p
+                        className={
+                          order.paymentStatus === 'paid'
+                            ? 'font-medium text-slate-500'
+                            : 'font-semibold text-slate-900'
+                        }
+                      >
+                        {order.paymentStatus === 'paid'
+                          ? 'Оплачено'
+                          : formatClientAmountDue(order)}
+                      </p>
+                      <p className="mt-0.5 text-xs text-slate-400">
+                        {PAYMENT_STATUS_LABELS[order.paymentStatus]}
+                        {order.paymentStatus !== 'paid' && (
+                          <>
+                            {' · '}
+                            загалом {formatMoneyDisplay(order.salePrice, 'UAH')}
+                          </>
+                        )}
+                      </p>
+                    </td>
+                    <td className="px-4 py-3 text-slate-600">
+                      {ORDER_STATUS_LABELS[order.status]}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </>
       )}
     </div>
