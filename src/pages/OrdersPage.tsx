@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { OrdersColumnsPicker } from '../components/OrdersColumnsPicker'
 import { OrdersTableOrderCell } from '../components/OrdersTableOrderCell'
 import { OrdersTableSortHeader } from '../components/OrdersTableSortHeader'
 import { useAuth } from '../context/useAuth'
@@ -9,10 +10,11 @@ import {
   orderRowHighlightClasses,
 } from '../lib/orderDisplay'
 import {
-  loadOrdersColumnOrder,
+  loadOrdersTableColumnsSettings,
   ORDERS_COLUMN_LABELS,
   reorderOrdersColumns,
-  saveOrdersColumnOrder,
+  saveOrdersTableColumnsSettings,
+  visibleColumnsFromSettings,
 } from '../lib/ordersColumnOrder'
 import {
   defaultSortDirectionForKey,
@@ -33,13 +35,27 @@ export function OrdersPage() {
   const [error, setError] = useState<string | null>(null)
   const [sortKey, setSortKey] = useState<OrdersSortKey>('created')
   const [sortDir, setSortDir] = useState<SortDirection>('desc')
-  const [columnOrder, setColumnOrder] = useState<OrdersSortKey[]>(() =>
-    loadOrdersColumnOrder(),
+  const [columnSettings, setColumnSettings] = useState(() =>
+    loadOrdersTableColumnsSettings(),
+  )
+  const visibleColumns = useMemo(
+    () => visibleColumnsFromSettings(columnSettings),
+    [columnSettings],
   )
   const [draggedColumn, setDraggedColumn] = useState<OrdersSortKey | null>(null)
   const [dropTargetColumn, setDropTargetColumn] =
     useState<OrdersSortKey | null>(null)
   const [page, setPage] = useState(1)
+
+  function persistColumnSettings(
+    next: typeof columnSettings | ((prev: typeof columnSettings) => typeof columnSettings),
+  ) {
+    setColumnSettings((prev) => {
+      const updated = typeof next === 'function' ? next(prev) : next
+      saveOrdersTableColumnsSettings(updated)
+      return updated
+    })
+  }
 
   function handleSort(key: OrdersSortKey) {
     if (key === sortKey) {
@@ -52,11 +68,10 @@ export function OrdersPage() {
 
   function handleColumnDrop(targetKey: OrdersSortKey) {
     if (!draggedColumn) return
-    setColumnOrder((prev) => {
-      const next = reorderOrdersColumns(prev, draggedColumn, targetKey)
-      saveOrdersColumnOrder(next)
-      return next
-    })
+    persistColumnSettings((prev) => ({
+      ...prev,
+      order: reorderOrdersColumns(prev.order, draggedColumn, targetKey),
+    }))
     setDraggedColumn(null)
     setDropTargetColumn(null)
   }
@@ -93,12 +108,20 @@ export function OrdersPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-2xl font-semibold">Заявки</h1>
-        <Link
-          to="/orders/new"
-          className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
-        >
-          Нова заявка
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          {!loading && orders.length > 0 && (
+            <OrdersColumnsPicker
+              settings={columnSettings}
+              onChange={persistColumnSettings}
+            />
+          )}
+          <Link
+            to="/orders/new"
+            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+          >
+            Нова заявка
+          </Link>
+        </div>
       </div>
 
       {loading && <p className="text-slate-500">Завантаження…</p>}
@@ -132,7 +155,7 @@ export function OrdersPage() {
                   >
                     №
                   </th>
-                  {columnOrder.map((columnKey) => (
+                  {visibleColumns.map((columnKey) => (
                     <OrdersTableSortHeader
                       key={columnKey}
                       label={ORDERS_COLUMN_LABELS[columnKey]}
@@ -172,7 +195,7 @@ export function OrdersPage() {
                     <td className="px-3 py-3 text-center text-slate-500 tabular-nums">
                       {(page - 1) * PAGE_SIZE + index + 1}
                     </td>
-                    {columnOrder.map((columnKey) => (
+                    {visibleColumns.map((columnKey) => (
                       <OrdersTableOrderCell
                         key={columnKey}
                         columnKey={columnKey}
