@@ -8,7 +8,7 @@ import {
   parseOrderForm,
   type OrderFormValues,
 } from '../lib/orderFormHelpers'
-import { getOrderById, updateOrder } from '../services/ordersService'
+import { getOrderById, updateOrder, deleteOrder } from '../services/ordersService'
 import type { Order } from '../types/order'
 import { deleteField } from 'firebase/firestore'
 
@@ -55,6 +55,8 @@ export function OrderDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     if (!orderId || !appUser?.organizationId) return
@@ -107,6 +109,21 @@ export function OrderDetailPage() {
     }
   }
 
+  async function handleDelete() {
+    if (!orderId) return
+    setError(null)
+    setDeleting(true)
+    try {
+      await deleteOrder(orderId)
+      navigate('/orders')
+    } catch (err) {
+      setError(getFirestoreErrorMessage(err))
+      setConfirmDelete(false)
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   if (!orderId) {
     return <Navigate to="/orders" replace />
   }
@@ -152,6 +169,44 @@ export function OrderDetailPage() {
         submitLabel="Зберегти зміни"
         onSubmit={handleSubmit}
       />
+
+      <section className="rounded-xl border border-red-200 bg-red-50/50 p-6">
+        <h2 className="text-sm font-semibold text-red-900">Небезпечна зона</h2>
+        <p className="mt-1 text-sm text-red-800">
+          Видалення заявки безповоротне. Дані клієнта та суми будуть втрачені.
+        </p>
+        {!confirmDelete ? (
+          <button
+            type="button"
+            onClick={() => setConfirmDelete(true)}
+            className="mt-4 rounded-lg border border-red-300 bg-white px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
+          >
+            Видалити заявку
+          </button>
+        ) : (
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <p className="text-sm font-medium text-red-900">
+              Видалити заявку «{order.clientName}»?
+            </p>
+            <button
+              type="button"
+              disabled={deleting}
+              onClick={() => void handleDelete()}
+              className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+            >
+              {deleting ? 'Видалення…' : 'Так, видалити'}
+            </button>
+            <button
+              type="button"
+              disabled={deleting}
+              onClick={() => setConfirmDelete(false)}
+              className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            >
+              Скасувати
+            </button>
+          </div>
+        )}
+      </section>
     </div>
   )
 }
