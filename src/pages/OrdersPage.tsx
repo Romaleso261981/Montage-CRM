@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { OrdersColumnsPicker } from '../components/OrdersColumnsPicker'
+import { inputClass } from '../components/AuthShell'
 import { OrdersTableOrderCell } from '../components/OrdersTableOrderCell'
 import { OrdersTableSortHeader } from '../components/OrdersTableSortHeader'
 import { useAuth } from '../context/useAuth'
@@ -9,6 +10,7 @@ import {
   getOrderRowHighlight,
   orderRowHighlightClasses,
 } from '../lib/orderDisplay'
+import { filterOrdersBySearch } from '../lib/orderSearch'
 import {
   clampPage,
   loadOrdersTableViewSettings,
@@ -42,6 +44,7 @@ export function OrdersPage() {
   const [draggedColumn, setDraggedColumn] = useState<OrdersSortKey | null>(null)
   const [dropTargetColumn, setDropTargetColumn] =
     useState<OrdersSortKey | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
 
   function persistViewSettings(
     update:
@@ -84,9 +87,14 @@ export function OrdersPage() {
     persistViewSettings({ page: nextPage })
   }
 
+  const filteredOrders = useMemo(
+    () => filterOrdersBySearch(orders, searchQuery),
+    [orders, searchQuery],
+  )
+
   const sortedOrders = useMemo(
-    () => sortOrders(orders, sortKey, sortDir),
-    [orders, sortKey, sortDir],
+    () => sortOrders(filteredOrders, sortKey, sortDir),
+    [filteredOrders, sortKey, sortDir],
   )
 
   const totalPages = Math.max(1, Math.ceil(sortedOrders.length / PAGE_SIZE))
@@ -147,6 +155,27 @@ export function OrdersPage() {
 
       {!loading && orders.length > 0 && (
         <>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <label className="block max-w-md flex-1">
+              <span className="text-sm font-medium text-slate-700">Пошук</span>
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value)
+                  persistViewSettings({ page: 1 })
+                }}
+                placeholder="Імʼя клієнта або номер телефону"
+                className={`${inputClass} mt-1`}
+                autoComplete="off"
+              />
+            </label>
+            {searchQuery.trim() && (
+              <p className="text-sm text-slate-600">
+                Знайдено {filteredOrders.length} з {orders.length}
+              </p>
+            )}
+          </div>
           <p className="text-sm text-slate-500">
             Натисніть на рядок, щоб відкрити заявку. Сортування — по назві
             колонки, порядок колонок — перетягніть іконку ⠿ у заголовку.
@@ -155,6 +184,11 @@ export function OrdersPage() {
               завершена. Налаштування таблиці зберігаються у цьому браузері.
             </span>
           </p>
+          {sortedOrders.length === 0 ? (
+            <p className="rounded-xl border border-slate-200 bg-white px-4 py-8 text-center text-slate-600">
+              За запитом «{searchQuery.trim()}» заявок не знайдено.
+            </p>
+          ) : (
           <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
             <table className="min-w-full text-left text-sm">
               <thead className="border-b border-slate-200 bg-slate-50 text-slate-600">
@@ -217,6 +251,7 @@ export function OrdersPage() {
               </tbody>
             </table>
           </div>
+          )}
           {sortedOrders.length > PAGE_SIZE && (
             <nav
               className="flex flex-wrap items-center justify-between gap-3 text-sm"
