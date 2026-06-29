@@ -126,6 +126,12 @@ export function OrdersPage() {
             <table className="min-w-full text-left text-sm">
               <thead className="border-b border-slate-200 bg-slate-50 text-slate-600">
                 <tr>
+                  <th
+                    className="w-12 px-3 py-3 text-center font-medium text-slate-600"
+                    scope="col"
+                  >
+                    №
+                  </th>
                   {columnOrder.map((columnKey) => (
                     <OrdersTableSortHeader
                       key={columnKey}
@@ -148,7 +154,7 @@ export function OrdersPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {paginatedOrders.map((order) => (
+                {paginatedOrders.map((order, index) => (
                   <tr
                     key={order.id}
                     className={`cursor-pointer ${orderRowHighlightClasses(getOrderRowHighlight(order))}`}
@@ -163,6 +169,9 @@ export function OrdersPage() {
                     role="link"
                     aria-label={`Заявка ${order.clientName}`}
                   >
+                    <td className="px-3 py-3 text-center text-slate-500 tabular-nums">
+                      {(page - 1) * PAGE_SIZE + index + 1}
+                    </td>
                     {columnOrder.map((columnKey) => (
                       <OrdersTableOrderCell
                         key={columnKey}
