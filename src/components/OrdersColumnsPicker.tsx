@@ -3,13 +3,13 @@ import {
   isColumnVisible,
   ORDERS_COLUMN_LABELS,
   setColumnVisible,
-  type OrdersTableColumnsSettings,
+  type OrdersTableViewSettings,
 } from '../lib/ordersColumnOrder'
 import type { OrdersSortKey } from '../lib/ordersTableSort'
 
 type OrdersColumnsPickerProps = {
-  settings: OrdersTableColumnsSettings
-  onChange: (settings: OrdersTableColumnsSettings) => void
+  settings: OrdersTableViewSettings
+  onChange: (settings: OrdersTableViewSettings) => void
 }
 
 export function OrdersColumnsPicker({

@@ -10,17 +10,17 @@ import {
   orderRowHighlightClasses,
 } from '../lib/orderDisplay'
 import {
-  loadOrdersTableColumnsSettings,
+  clampPage,
+  loadOrdersTableViewSettings,
   ORDERS_COLUMN_LABELS,
   reorderOrdersColumns,
-  saveOrdersTableColumnsSettings,
+  saveOrdersTableViewSettings,
   visibleColumnsFromSettings,
 } from '../lib/ordersColumnOrder'
 import {
   defaultSortDirectionForKey,
   sortOrders,
   type OrdersSortKey,
-  type SortDirection,
 } from '../lib/ordersTableSort'
 import { getOrdersByOrganizationId } from '../services/ordersService'
 import type { Order } from '../types/order'
@@ -33,47 +33,55 @@ export function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [sortKey, setSortKey] = useState<OrdersSortKey>('created')
-  const [sortDir, setSortDir] = useState<SortDirection>('desc')
-  const [columnSettings, setColumnSettings] = useState(() =>
-    loadOrdersTableColumnsSettings(),
-  )
+  const [viewSettings, setViewSettings] = useState(loadOrdersTableViewSettings)
+  const { sortKey, sortDir, page } = viewSettings
   const visibleColumns = useMemo(
-    () => visibleColumnsFromSettings(columnSettings),
-    [columnSettings],
+    () => visibleColumnsFromSettings(viewSettings),
+    [viewSettings],
   )
   const [draggedColumn, setDraggedColumn] = useState<OrdersSortKey | null>(null)
   const [dropTargetColumn, setDropTargetColumn] =
     useState<OrdersSortKey | null>(null)
-  const [page, setPage] = useState(1)
 
-  function persistColumnSettings(
-    next: typeof columnSettings | ((prev: typeof columnSettings) => typeof columnSettings),
+  function persistViewSettings(
+    update:
+      | Partial<typeof viewSettings>
+      | ((prev: typeof viewSettings) => typeof viewSettings),
   ) {
-    setColumnSettings((prev) => {
-      const updated = typeof next === 'function' ? next(prev) : next
-      saveOrdersTableColumnsSettings(updated)
-      return updated
+    setViewSettings((prev) => {
+      const next =
+        typeof update === 'function'
+          ? update(prev)
+          : { ...prev, ...update }
+      saveOrdersTableViewSettings(next)
+      return next
     })
   }
 
   function handleSort(key: OrdersSortKey) {
     if (key === sortKey) {
-      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+      persistViewSettings({ sortDir: sortDir === 'asc' ? 'desc' : 'asc' })
     } else {
-      setSortKey(key)
-      setSortDir(defaultSortDirectionForKey(key))
+      persistViewSettings({
+        sortKey: key,
+        sortDir: defaultSortDirectionForKey(key),
+        page: 1,
+      })
     }
   }
 
   function handleColumnDrop(targetKey: OrdersSortKey) {
     if (!draggedColumn) return
-    persistColumnSettings((prev) => ({
+    persistViewSettings((prev) => ({
       ...prev,
       order: reorderOrdersColumns(prev.order, draggedColumn, targetKey),
     }))
     setDraggedColumn(null)
     setDropTargetColumn(null)
+  }
+
+  function goToPage(nextPage: number) {
+    persistViewSettings({ page: nextPage })
   }
 
   const sortedOrders = useMemo(
@@ -89,12 +97,14 @@ export function OrdersPage() {
   }, [sortedOrders, page])
 
   useEffect(() => {
-    setPage((p) => Math.min(Math.max(1, p), totalPages))
+    setViewSettings((prev) => {
+      const clamped = clampPage(prev.page, totalPages)
+      if (clamped === prev.page) return prev
+      const next = { ...prev, page: clamped }
+      saveOrdersTableViewSettings(next)
+      return next
+    })
   }, [totalPages])
-
-  useEffect(() => {
-    setPage(1)
-  }, [sortKey, sortDir])
 
   useEffect(() => {
     if (!appUser?.organizationId) return
@@ -111,8 +121,8 @@ export function OrdersPage() {
         <div className="flex flex-wrap items-center gap-2">
           {!loading && orders.length > 0 && (
             <OrdersColumnsPicker
-              settings={columnSettings}
-              onChange={persistColumnSettings}
+              settings={viewSettings}
+              onChange={(next) => persistViewSettings(next)}
             />
           )}
           <Link
@@ -142,7 +152,7 @@ export function OrdersPage() {
             колонки, порядок колонок — перетягніть іконку ⠿ у заголовку.
             <span className="mt-1 block">
               Кольори: жовтий — монтаж завтра, червоний — сьогодні, зелений —
-              завершена.
+              завершена. Налаштування таблиці зберігаються у цьому браузері.
             </span>
           </p>
           <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -221,7 +231,7 @@ export function OrdersPage() {
                 <button
                   type="button"
                   disabled={page <= 1}
-                  onClick={() => setPage((p) => p - 1)}
+                  onClick={() => goToPage(page - 1)}
                   className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Назад
@@ -232,7 +242,7 @@ export function OrdersPage() {
                 <button
                   type="button"
                   disabled={page >= totalPages}
-                  onClick={() => setPage((p) => p + 1)}
+                  onClick={() => goToPage(page + 1)}
                   className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Далі
