@@ -40,6 +40,10 @@ export type Order = {
   acUnitPrice?: number
   /** Вартість встановлення для клієнта (₴). */
   installationPrice?: number
+  /** Демонтаж (₴). */
+  dismantlingPrice?: number
+  /** Заправка (₴). */
+  refillPrice?: number
   /** Загальна сума для клієнта в гривнях. */
   salePrice: number
 

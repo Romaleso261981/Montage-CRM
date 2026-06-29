@@ -30,17 +30,27 @@ export function OrderFormEditor({
 }: OrderFormEditorProps) {
   const patch = onChange
 
-  function handleAcUnitPriceChange(value: string) {
-    patch({
-      acUnitPrice: value,
-      salePrice: applyClientTotal(value, values.installationPrice),
-    })
+  function recalcTotal(next: Partial<OrderFormValues>) {
+    const merged = { ...values, ...next }
+    return applyClientTotal(
+      merged.acUnitPrice,
+      merged.installationPrice,
+      merged.dismantlingPrice,
+      merged.refillPrice,
+    )
   }
 
-  function handleInstallationPriceChange(value: string) {
+  function handleClientPriceChange(
+    field:
+      | 'acUnitPrice'
+      | 'installationPrice'
+      | 'dismantlingPrice'
+      | 'refillPrice',
+    value: string,
+  ) {
     patch({
-      installationPrice: value,
-      salePrice: applyClientTotal(values.acUnitPrice, value),
+      [field]: value,
+      salePrice: recalcTotal({ [field]: value }),
     })
   }
 
@@ -77,30 +87,42 @@ export function OrderFormEditor({
       <div className="space-y-4 rounded-lg border border-slate-200 p-4">
         <p className="text-sm font-medium text-slate-900">Оплата від клієнта</p>
         <div className="grid gap-4 sm:grid-cols-2">
-          <FormField label="Вартість кондиціонера *">
+          <FormField label="Вартість кондиціонера">
             <MoneyInput
-              required
               currency="UAH"
               value={values.acUnitPrice}
-              onChange={handleAcUnitPriceChange}
+              onChange={(v) => handleClientPriceChange('acUnitPrice', v)}
             />
           </FormField>
-          <FormField label="Вартість встановлення *">
+          <FormField label="Вартість встановлення">
             <MoneyInput
-              required
               currency="UAH"
               value={values.installationPrice}
-              onChange={handleInstallationPriceChange}
+              onChange={(v) => handleClientPriceChange('installationPrice', v)}
+            />
+          </FormField>
+          <FormField label="Демонтаж">
+            <MoneyInput
+              currency="UAH"
+              value={values.dismantlingPrice}
+              onChange={(v) => handleClientPriceChange('dismantlingPrice', v)}
+            />
+          </FormField>
+          <FormField label="Заправка">
+            <MoneyInput
+              currency="UAH"
+              value={values.refillPrice}
+              onChange={(v) => handleClientPriceChange('refillPrice', v)}
             />
           </FormField>
         </div>
-        <FormField label="Загальна сума для клієнта *">
+        <FormField label="Загальна сума для клієнта">
           <MoneyInput
-            required
             readOnly
             currency="UAH"
             value={values.salePrice}
             onChange={() => {}}
+            placeholder="сума заповнених позицій"
           />
         </FormField>
       </div>

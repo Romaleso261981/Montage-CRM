@@ -1,15 +1,29 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ORDER_STATUS_LABELS, PAYMENT_STATUS_LABELS } from '../constants/orderLabels'
+import { OrdersTableOrderCell } from '../components/OrdersTableOrderCell'
+import { OrdersTableSortHeader } from '../components/OrdersTableSortHeader'
 import { useAuth } from '../context/useAuth'
-import { getOrdersByOrganizationId } from '../services/ordersService'
 import { getFirestoreErrorMessage } from '../lib/firestoreErrors'
-import { formatMoneyDisplay } from '../lib/moneyFormat'
 import {
-  formatClientAmountDue,
-  formatInstallationSchedule,
+  getOrderRowHighlight,
+  orderRowHighlightClasses,
 } from '../lib/orderDisplay'
+import {
+  loadOrdersColumnOrder,
+  ORDERS_COLUMN_LABELS,
+  reorderOrdersColumns,
+  saveOrdersColumnOrder,
+} from '../lib/ordersColumnOrder'
+import {
+  defaultSortDirectionForKey,
+  sortOrders,
+  type OrdersSortKey,
+  type SortDirection,
+} from '../lib/ordersTableSort'
+import { getOrdersByOrganizationId } from '../services/ordersService'
 import type { Order } from '../types/order'
+
+const PAGE_SIZE = 10
 
 export function OrdersPage() {
   const { appUser } = useAuth()
@@ -17,6 +31,55 @@ export function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [sortKey, setSortKey] = useState<OrdersSortKey>('created')
+  const [sortDir, setSortDir] = useState<SortDirection>('desc')
+  const [columnOrder, setColumnOrder] = useState<OrdersSortKey[]>(() =>
+    loadOrdersColumnOrder(),
+  )
+  const [draggedColumn, setDraggedColumn] = useState<OrdersSortKey | null>(null)
+  const [dropTargetColumn, setDropTargetColumn] =
+    useState<OrdersSortKey | null>(null)
+  const [page, setPage] = useState(1)
+
+  function handleSort(key: OrdersSortKey) {
+    if (key === sortKey) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortKey(key)
+      setSortDir(defaultSortDirectionForKey(key))
+    }
+  }
+
+  function handleColumnDrop(targetKey: OrdersSortKey) {
+    if (!draggedColumn) return
+    setColumnOrder((prev) => {
+      const next = reorderOrdersColumns(prev, draggedColumn, targetKey)
+      saveOrdersColumnOrder(next)
+      return next
+    })
+    setDraggedColumn(null)
+    setDropTargetColumn(null)
+  }
+
+  const sortedOrders = useMemo(
+    () => sortOrders(orders, sortKey, sortDir),
+    [orders, sortKey, sortDir],
+  )
+
+  const totalPages = Math.max(1, Math.ceil(sortedOrders.length / PAGE_SIZE))
+
+  const paginatedOrders = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE
+    return sortedOrders.slice(start, start + PAGE_SIZE)
+  }, [sortedOrders, page])
+
+  useEffect(() => {
+    setPage((p) => Math.min(Math.max(1, p), totalPages))
+  }, [totalPages])
+
+  useEffect(() => {
+    setPage(1)
+  }, [sortKey, sortDir])
 
   useEffect(() => {
     if (!appUser?.organizationId) return
@@ -52,24 +115,43 @@ export function OrdersPage() {
       {!loading && orders.length > 0 && (
         <>
           <p className="text-sm text-slate-500">
-            Натисніть на рядок, щоб відкрити та редагувати заявку.
+            Натисніть на рядок, щоб відкрити заявку. Сортування — по назві
+            колонки, порядок колонок — перетягніть іконку ⠿ у заголовку.
+            <span className="mt-1 block">
+              Кольори: жовтий — монтаж завтра, червоний — сьогодні, зелений —
+              завершена.
+            </span>
           </p>
           <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
             <table className="min-w-full text-left text-sm">
               <thead className="border-b border-slate-200 bg-slate-50 text-slate-600">
                 <tr>
-                  <th className="px-4 py-3 font-medium">Клієнт</th>
-                  <th className="px-4 py-3 font-medium">Телефон</th>
-                  <th className="px-4 py-3 font-medium">Монтаж</th>
-                  <th className="px-4 py-3 font-medium">До сплати з клієнта</th>
-                  <th className="px-4 py-3 font-medium">Статус</th>
+                  {columnOrder.map((columnKey) => (
+                    <OrdersTableSortHeader
+                      key={columnKey}
+                      label={ORDERS_COLUMN_LABELS[columnKey]}
+                      columnKey={columnKey}
+                      activeKey={sortKey}
+                      direction={sortDir}
+                      onSort={handleSort}
+                      isDragging={draggedColumn === columnKey}
+                      isDropTarget={dropTargetColumn === columnKey}
+                      onDragStart={setDraggedColumn}
+                      onDragEnd={() => {
+                        setDraggedColumn(null)
+                        setDropTargetColumn(null)
+                      }}
+                      onDragOver={setDropTargetColumn}
+                      onDrop={handleColumnDrop}
+                    />
+                  ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {orders.map((order) => (
+                {paginatedOrders.map((order) => (
                   <tr
                     key={order.id}
-                    className="cursor-pointer hover:bg-slate-100"
+                    className={`cursor-pointer ${orderRowHighlightClasses(getOrderRowHighlight(order))}`}
                     onClick={() => navigate(`/orders/${order.id}`)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
@@ -81,61 +163,51 @@ export function OrdersPage() {
                     role="link"
                     aria-label={`Заявка ${order.clientName}`}
                   >
-                    <td className="px-4 py-3">
-                      <p className="font-medium text-slate-900">
-                        {order.clientName}
-                      </p>
-                      <p className="mt-0.5 text-xs leading-snug text-slate-500">
-                        {order.address?.trim() || '—'}
-                      </p>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <a
-                        href={`tel:${order.phone.replace(/\s/g, '')}`}
-                        className="text-slate-800 underline-offset-2 hover:underline"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {order.phone}
-                      </a>
-                    </td>
-                    <td className="px-4 py-3">
-                      <p>{formatInstallationSchedule(order)}</p>
-                      {order.installerName?.trim() && (
-                        <p className="mt-0.5 text-xs text-slate-400">
-                          {order.installerName}
-                        </p>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <p
-                        className={
-                          order.paymentStatus === 'paid'
-                            ? 'font-medium text-slate-500'
-                            : 'font-semibold text-slate-900'
-                        }
-                      >
-                        {order.paymentStatus === 'paid'
-                          ? 'Оплачено'
-                          : formatClientAmountDue(order)}
-                      </p>
-                      <p className="mt-0.5 text-xs text-slate-400">
-                        {PAYMENT_STATUS_LABELS[order.paymentStatus]}
-                        {order.paymentStatus !== 'paid' && (
-                          <>
-                            {' · '}
-                            загалом {formatMoneyDisplay(order.salePrice, 'UAH')}
-                          </>
-                        )}
-                      </p>
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">
-                      {ORDER_STATUS_LABELS[order.status]}
-                    </td>
+                    {columnOrder.map((columnKey) => (
+                      <OrdersTableOrderCell
+                        key={columnKey}
+                        columnKey={columnKey}
+                        order={order}
+                      />
+                    ))}
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+          {sortedOrders.length > PAGE_SIZE && (
+            <nav
+              className="flex flex-wrap items-center justify-between gap-3 text-sm"
+              aria-label="Сторінки заявок"
+            >
+              <p className="text-slate-600">
+                Показано {(page - 1) * PAGE_SIZE + 1}–
+                {Math.min(page * PAGE_SIZE, sortedOrders.length)} з{' '}
+                {sortedOrders.length}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={page <= 1}
+                  onClick={() => setPage((p) => p - 1)}
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Назад
+                </button>
+                <span className="text-slate-600">
+                  {page} / {totalPages}
+                </span>
+                <button
+                  type="button"
+                  disabled={page >= totalPages}
+                  onClick={() => setPage((p) => p + 1)}
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Далі
+                </button>
+              </div>
+            </nav>
+          )}
         </>
       )}
     </div>

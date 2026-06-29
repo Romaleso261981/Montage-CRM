@@ -3,19 +3,15 @@ import { Link, useNavigate } from 'react-router-dom'
 import { FormField, inputClass } from '../components/AuthShell'
 import {
   AcBrandModelFields,
-  resolveAcBrandAndModel,
 } from '../components/AcBrandModelFields'
 import { useAuth } from '../context/useAuth'
 import { MoneyInput } from '../components/MoneyInput'
 import { getFirestoreErrorMessage } from '../lib/firestoreErrors'
 import { normalizeMoneyInput, parseMoneyInput } from '../lib/moneyFormat'
+import { applyClientTotal, parseOrderForm } from '../lib/orderFormHelpers'
 import { uahFromUsd } from '../lib/orderPricing'
 import { createOrder } from '../services/ordersService'
-import type { OrderSaleDetails, OrderStatus, PaymentStatus } from '../types/order'
-
-function parseRequiredMoney(value: string): number | null {
-  return parseMoneyInput(value)
-}
+import type { OrderStatus, PaymentStatus } from '../types/order'
 
 export function NewOrderPage() {
   const { appUser, firebaseUser } = useAuth()
@@ -26,6 +22,8 @@ export function NewOrderPage() {
   const [address, setAddress] = useState('')
   const [acUnitPrice, setAcUnitPrice] = useState('')
   const [installationPrice, setInstallationPrice] = useState('')
+  const [dismantlingPrice, setDismantlingPrice] = useState('')
+  const [refillPrice, setRefillPrice] = useState('')
   const [salePrice, setSalePrice] = useState('')
   const [isMySale, setIsMySale] = useState(false)
   const [brandSelection, setBrandSelection] = useState('')
@@ -54,115 +52,72 @@ export function NewOrderPage() {
     setSupplierPaidAmount(normalizeMoneyInput(String(uahFromUsd(usd, rate))))
   }
 
-  function applyClientTotal(acStr: string, installStr: string) {
-    const ac = parseMoneyInput(acStr)
-    const install = parseMoneyInput(installStr)
-    if (ac === null && install === null) {
-      setSalePrice('')
-      return
-    }
-    const total = (ac ?? 0) + (install ?? 0)
-    setSalePrice(normalizeMoneyInput(String(total)))
+  function syncClientTotal(
+    acStr: string,
+    installStr: string,
+    dismantlingStr: string,
+    refillStr: string,
+  ) {
+    setSalePrice(applyClientTotal(acStr, installStr, dismantlingStr, refillStr))
   }
 
   function handleAcUnitPriceChange(value: string) {
     setAcUnitPrice(value)
-    applyClientTotal(value, installationPrice)
+    syncClientTotal(value, installationPrice, dismantlingPrice, refillPrice)
   }
 
   function handleInstallationPriceChange(value: string) {
     setInstallationPrice(value)
-    applyClientTotal(acUnitPrice, value)
+    syncClientTotal(acUnitPrice, value, dismantlingPrice, refillPrice)
+  }
+
+  function handleDismantlingPriceChange(value: string) {
+    setDismantlingPrice(value)
+    syncClientTotal(acUnitPrice, installationPrice, value, refillPrice)
+  }
+
+  function handleRefillPriceChange(value: string) {
+    setRefillPrice(value)
+    syncClientTotal(acUnitPrice, installationPrice, dismantlingPrice, value)
   }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (!appUser?.organizationId || !firebaseUser) return
 
-    const ac = parseRequiredMoney(acUnitPrice)
-    const install = parseRequiredMoney(installationPrice)
-    if (ac === null || install === null) {
-      setError('Вкажіть вартість кондиціонера та встановлення')
+    const parsed = parseOrderForm({
+      clientName,
+      phone,
+      address,
+      acUnitPrice,
+      installationPrice,
+      dismantlingPrice,
+      refillPrice,
+      salePrice,
+      isMySale,
+      brandSelection,
+      customBrand,
+      modelSelection,
+      customModel,
+      productUrl,
+      retailPrice,
+      wholesalePrice,
+      supplierName,
+      supplierPaidInUsd,
+      supplierPaidAmountUsd,
+      supplierUsdExchangeRate,
+      supplierPaidAmount,
+      supplierPurchaseDate,
+      status,
+      paymentStatus,
+      installationDate: '',
+      installationTime: '',
+      installerName: '',
+      comment,
+    })
+    if (!parsed.ok) {
+      setError(parsed.error)
       return
-    }
-
-    const price = parseRequiredMoney(salePrice)
-    const expectedTotal = Math.round((ac + install) * 100) / 100
-    if (price === null || Math.abs(price - expectedTotal) > 0.02) {
-      setError('Загальна сума має дорівнювати вартості кондиціонера + встановлення')
-      return
-    }
-
-    let saleDetails: OrderSaleDetails | undefined
-
-    if (isMySale) {
-      const resolved = resolveAcBrandAndModel(
-        brandSelection,
-        customBrand,
-        modelSelection,
-        customModel,
-      )
-      if (!resolved) {
-        setError('Оберіть бренд і модель кондиціонера зі списку або вкажіть вручну')
-        return
-      }
-      const { acName, acModel } = resolved
-
-      if (!supplierName.trim()) {
-        setError('Вкажіть постачальника')
-        return
-      }
-      if (!supplierPurchaseDate) {
-        setError('Вкажіть дату закупівлі у постачальника')
-        return
-      }
-
-      const retail = parseRequiredMoney(retailPrice)
-      const wholesale = parseRequiredMoney(wholesalePrice)
-      if (retail === null || wholesale === null) {
-        setError('Перевірте роздрібну та оптову вартість')
-        return
-      }
-
-      let paidUah: number
-      let paidUsd: number | undefined
-      let paidRate: number | undefined
-
-      if (supplierPaidInUsd) {
-        const usd = parseRequiredMoney(supplierPaidAmountUsd)
-        const rate = parseRequiredMoney(supplierUsdExchangeRate)
-        if (usd === null || rate === null || rate === 0) {
-          setError('Вкажіть суму оплати постачальнику в USD і курс')
-          return
-        }
-        paidUsd = usd
-        paidRate = rate
-        paidUah = uahFromUsd(usd, rate)
-      } else {
-        const paid = parseRequiredMoney(supplierPaidAmount)
-        if (paid === null) {
-          setError('Вкажіть суму оплати постачальнику в гривнях')
-          return
-        }
-        paidUah = paid
-      }
-
-      saleDetails = {
-        acName: acName.trim(),
-        acModel: acModel.trim(),
-        productUrl: productUrl.trim() || undefined,
-        retailPrice: retail,
-        wholesalePrice: wholesale,
-        supplierName: supplierName.trim(),
-        supplierPaidAmount: paidUah,
-        ...(paidUsd != null && paidRate != null
-          ? {
-              supplierPaidAmountUsd: paidUsd,
-              supplierUsdExchangeRate: paidRate,
-            }
-          : {}),
-        supplierPurchaseDate,
-      }
     }
 
     setError(null)
@@ -170,17 +125,7 @@ export function NewOrderPage() {
     try {
       await createOrder(appUser.organizationId, {
         createdBy: firebaseUser.uid,
-        clientName: clientName.trim(),
-        phone: phone.trim(),
-        address: address.trim(),
-        acUnitPrice: ac,
-        installationPrice: install,
-        salePrice: expectedTotal,
-        isMySale,
-        saleDetails: isMySale ? saleDetails : undefined,
-        status,
-        paymentStatus,
-        comment: comment.trim() || undefined,
+        ...parsed.data,
       })
       navigate('/orders')
     } catch (err) {
@@ -230,31 +175,42 @@ export function NewOrderPage() {
         <div className="space-y-4 rounded-lg border border-slate-200 p-4">
           <p className="text-sm font-medium text-slate-900">Оплата від клієнта</p>
           <div className="grid gap-4 sm:grid-cols-2">
-            <FormField label="Вартість кондиціонера *">
+            <FormField label="Вартість кондиціонера">
               <MoneyInput
-                required
                 currency="UAH"
                 value={acUnitPrice}
                 onChange={handleAcUnitPriceChange}
               />
             </FormField>
-            <FormField label="Вартість встановлення *">
+            <FormField label="Вартість встановлення">
               <MoneyInput
-                required
                 currency="UAH"
                 value={installationPrice}
                 onChange={handleInstallationPriceChange}
               />
             </FormField>
+            <FormField label="Демонтаж">
+              <MoneyInput
+                currency="UAH"
+                value={dismantlingPrice}
+                onChange={handleDismantlingPriceChange}
+              />
+            </FormField>
+            <FormField label="Заправка">
+              <MoneyInput
+                currency="UAH"
+                value={refillPrice}
+                onChange={handleRefillPriceChange}
+              />
+            </FormField>
           </div>
-          <FormField label="Загальна сума для клієнта *">
+          <FormField label="Загальна сума для клієнта">
             <MoneyInput
-              required
               readOnly
               currency="UAH"
               value={salePrice}
               onChange={() => {}}
-              placeholder="кондиціонер + встановлення"
+              placeholder="сума заповнених позицій"
             />
           </FormField>
         </div>

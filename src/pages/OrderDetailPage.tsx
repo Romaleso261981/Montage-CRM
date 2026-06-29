@@ -18,6 +18,8 @@ const emptyForm: OrderFormValues = {
   address: '',
   acUnitPrice: '',
   installationPrice: '',
+  dismantlingPrice: '',
+  refillPrice: '',
   salePrice: '',
   isMySale: false,
   brandSelection: '',

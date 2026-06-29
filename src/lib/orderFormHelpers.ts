@@ -46,6 +46,8 @@ export type OrderFormValues = {
   address: string
   acUnitPrice: string
   installationPrice: string
+  dismantlingPrice: string
+  refillPrice: string
   salePrice: string
   isMySale: boolean
   brandSelection: string
@@ -89,8 +91,10 @@ export function orderToFormValues(order: Order): OrderFormValues {
     clientName: order.clientName,
     phone: order.phone,
     address: order.address,
-    acUnitPrice: moneyFieldFromNumber(order.acUnitPrice ?? order.salePrice),
-    installationPrice: moneyFieldFromNumber(order.installationPrice ?? 0),
+    acUnitPrice: moneyFieldFromNumber(order.acUnitPrice),
+    installationPrice: moneyFieldFromNumber(order.installationPrice),
+    dismantlingPrice: moneyFieldFromNumber(order.dismantlingPrice),
+    refillPrice: moneyFieldFromNumber(order.refillPrice),
     salePrice: moneyFieldFromNumber(order.salePrice),
     isMySale: order.isMySale ?? false,
     ...brand,
@@ -112,8 +116,21 @@ export function orderToFormValues(order: Order): OrderFormValues {
   }
 }
 
+function parseOptionalMoney(value: string): number | null {
+  if (!value.trim()) return null
+  return parseMoneyInput(value)
+}
+
 function parseRequiredMoney(value: string): number | null {
   return parseMoneyInput(value)
+}
+
+function sumClientLineItems(
+  ...parts: (number | null)[]
+): number {
+  const nums = parts.filter((p): p is number => p !== null)
+  if (nums.length === 0) return 0
+  return Math.round(nums.reduce((a, b) => a + b, 0) * 100) / 100
 }
 
 export type ParsedOrderForm =
@@ -123,8 +140,10 @@ export type ParsedOrderForm =
         clientName: string
         phone: string
         address: string
-        acUnitPrice: number
-        installationPrice: number
+        acUnitPrice?: number
+        installationPrice?: number
+        dismantlingPrice?: number
+        refillPrice?: number
         salePrice: number
         isMySale: boolean
         saleDetails?: OrderSaleDetails
@@ -139,18 +158,19 @@ export type ParsedOrderForm =
   | { ok: false; error: string }
 
 export function parseOrderForm(values: OrderFormValues): ParsedOrderForm {
-  const ac = parseRequiredMoney(values.acUnitPrice)
-  const install = parseRequiredMoney(values.installationPrice)
-  if (ac === null || install === null) {
-    return { ok: false, error: 'Вкажіть вартість кондиціонера та встановлення' }
-  }
+  const ac = parseOptionalMoney(values.acUnitPrice)
+  const install = parseOptionalMoney(values.installationPrice)
+  const dismantling = parseOptionalMoney(values.dismantlingPrice)
+  const refill = parseOptionalMoney(values.refillPrice)
 
-  const price = parseRequiredMoney(values.salePrice)
-  const expectedTotal = Math.round((ac + install) * 100) / 100
-  if (price === null || Math.abs(price - expectedTotal) > 0.02) {
+  const expectedTotal = sumClientLineItems(ac, install, dismantling, refill)
+
+  const price = parseOptionalMoney(values.salePrice)
+  if (price !== null && Math.abs(price - expectedTotal) > 0.02) {
     return {
       ok: false,
-      error: 'Загальна сума має дорівнювати вартості кондиціонера + встановлення',
+      error:
+        'Загальна сума має дорівнювати сумі заповнених позицій (кондиціонер, встановлення, демонтаж, заправка)',
     }
   }
 
@@ -177,8 +197,8 @@ export function parseOrderForm(values: OrderFormValues): ParsedOrderForm {
       return { ok: false, error: 'Вкажіть дату закупівлі у постачальника' }
     }
 
-    const retail = parseRequiredMoney(values.retailPrice)
-    const wholesale = parseRequiredMoney(values.wholesalePrice)
+    const retail = parseOptionalMoney(values.retailPrice)
+    const wholesale = parseOptionalMoney(values.wholesalePrice)
     if (retail === null || wholesale === null) {
       return { ok: false, error: 'Перевірте роздрібну та оптову вартість' }
     }
@@ -228,8 +248,10 @@ export function parseOrderForm(values: OrderFormValues): ParsedOrderForm {
       clientName: values.clientName.trim(),
       phone: values.phone.trim(),
       address: values.address.trim(),
-      acUnitPrice: ac,
-      installationPrice: install,
+      acUnitPrice: ac ?? undefined,
+      installationPrice: install ?? undefined,
+      dismantlingPrice: dismantling ?? undefined,
+      refillPrice: refill ?? undefined,
       salePrice: expectedTotal,
       isMySale: values.isMySale,
       saleDetails: values.isMySale ? saleDetails : undefined,
@@ -243,11 +265,26 @@ export function parseOrderForm(values: OrderFormValues): ParsedOrderForm {
   }
 }
 
-export function applyClientTotal(acStr: string, installStr: string): string {
-  const ac = parseMoneyInput(acStr)
-  const install = parseMoneyInput(installStr)
-  if (ac === null && install === null) return ''
-  const total = (ac ?? 0) + (install ?? 0)
+export function applyClientTotal(
+  acStr: string,
+  installStr: string,
+  dismantlingStr: string,
+  refillStr: string,
+): string {
+  const total = sumClientLineItems(
+    parseOptionalMoney(acStr),
+    parseOptionalMoney(installStr),
+    parseOptionalMoney(dismantlingStr),
+    parseOptionalMoney(refillStr),
+  )
+  if (
+    !acStr.trim() &&
+    !installStr.trim() &&
+    !dismantlingStr.trim() &&
+    !refillStr.trim()
+  ) {
+    return ''
+  }
   return normalizeMoneyInput(String(total))
 }
 
