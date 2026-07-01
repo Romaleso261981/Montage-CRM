@@ -44,6 +44,12 @@ export type Order = {
   dismantlingPrice?: number
   /** Заправка (₴). */
   refillPrice?: number
+  /** Ремонт (₴). */
+  repairPrice?: number
+  /** Чистка дренажу (₴). */
+  drainCleaningPrice?: number
+  /** Чистка кондиціонера (₴). */
+  acCleaningPrice?: number
   /** Загальна сума для клієнта в гривнях. */
   salePrice: number
 

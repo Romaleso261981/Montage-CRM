@@ -8,7 +8,12 @@ import { useAuth } from '../context/useAuth'
 import { MoneyInput } from '../components/MoneyInput'
 import { getFirestoreErrorMessage } from '../lib/firestoreErrors'
 import { normalizeMoneyInput, parseMoneyInput } from '../lib/moneyFormat'
-import { applyClientTotal, parseOrderForm } from '../lib/orderFormHelpers'
+import {
+  applyClientTotalFromValues,
+  CLIENT_PAYMENT_FIELDS,
+  parseOrderForm,
+  type ClientPriceFormKey,
+} from '../lib/orderFormHelpers'
 import { uahFromUsd } from '../lib/orderPricing'
 import { createOrder } from '../services/ordersService'
 import type { OrderStatus, PaymentStatus } from '../types/order'
@@ -24,6 +29,9 @@ export function NewOrderPage() {
   const [installationPrice, setInstallationPrice] = useState('')
   const [dismantlingPrice, setDismantlingPrice] = useState('')
   const [refillPrice, setRefillPrice] = useState('')
+  const [repairPrice, setRepairPrice] = useState('')
+  const [drainCleaningPrice, setDrainCleaningPrice] = useState('')
+  const [acCleaningPrice, setAcCleaningPrice] = useState('')
   const [salePrice, setSalePrice] = useState('')
   const [isMySale, setIsMySale] = useState(false)
   const [brandSelection, setBrandSelection] = useState('')
@@ -52,33 +60,33 @@ export function NewOrderPage() {
     setSupplierPaidAmount(normalizeMoneyInput(String(uahFromUsd(usd, rate))))
   }
 
-  function syncClientTotal(
-    acStr: string,
-    installStr: string,
-    dismantlingStr: string,
-    refillStr: string,
-  ) {
-    setSalePrice(applyClientTotal(acStr, installStr, dismantlingStr, refillStr))
+  const clientPriceState: Record<ClientPriceFormKey, string> = {
+    acUnitPrice,
+    installationPrice,
+    dismantlingPrice,
+    refillPrice,
+    repairPrice,
+    drainCleaningPrice,
+    acCleaningPrice,
   }
 
-  function handleAcUnitPriceChange(value: string) {
-    setAcUnitPrice(value)
-    syncClientTotal(value, installationPrice, dismantlingPrice, refillPrice)
+  const clientPriceSetters: Record<
+    ClientPriceFormKey,
+    (value: string) => void
+  > = {
+    acUnitPrice: setAcUnitPrice,
+    installationPrice: setInstallationPrice,
+    dismantlingPrice: setDismantlingPrice,
+    refillPrice: setRefillPrice,
+    repairPrice: setRepairPrice,
+    drainCleaningPrice: setDrainCleaningPrice,
+    acCleaningPrice: setAcCleaningPrice,
   }
 
-  function handleInstallationPriceChange(value: string) {
-    setInstallationPrice(value)
-    syncClientTotal(acUnitPrice, value, dismantlingPrice, refillPrice)
-  }
-
-  function handleDismantlingPriceChange(value: string) {
-    setDismantlingPrice(value)
-    syncClientTotal(acUnitPrice, installationPrice, value, refillPrice)
-  }
-
-  function handleRefillPriceChange(value: string) {
-    setRefillPrice(value)
-    syncClientTotal(acUnitPrice, installationPrice, dismantlingPrice, value)
+  function handleClientPriceChange(key: ClientPriceFormKey, value: string) {
+    clientPriceSetters[key](value)
+    const next = { ...clientPriceState, [key]: value }
+    setSalePrice(applyClientTotalFromValues(next))
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -93,6 +101,9 @@ export function NewOrderPage() {
       installationPrice,
       dismantlingPrice,
       refillPrice,
+      repairPrice,
+      drainCleaningPrice,
+      acCleaningPrice,
       salePrice,
       isMySale,
       brandSelection,
@@ -175,34 +186,15 @@ export function NewOrderPage() {
         <div className="space-y-4 rounded-lg border border-slate-200 p-4">
           <p className="text-sm font-medium text-slate-900">Оплата від клієнта</p>
           <div className="grid gap-4 sm:grid-cols-2">
-            <FormField label="Вартість кондиціонера">
-              <MoneyInput
-                currency="UAH"
-                value={acUnitPrice}
-                onChange={handleAcUnitPriceChange}
-              />
-            </FormField>
-            <FormField label="Вартість встановлення">
-              <MoneyInput
-                currency="UAH"
-                value={installationPrice}
-                onChange={handleInstallationPriceChange}
-              />
-            </FormField>
-            <FormField label="Демонтаж">
-              <MoneyInput
-                currency="UAH"
-                value={dismantlingPrice}
-                onChange={handleDismantlingPriceChange}
-              />
-            </FormField>
-            <FormField label="Заправка">
-              <MoneyInput
-                currency="UAH"
-                value={refillPrice}
-                onChange={handleRefillPriceChange}
-              />
-            </FormField>
+            {CLIENT_PAYMENT_FIELDS.map(({ key, label }) => (
+              <FormField key={key} label={label}>
+                <MoneyInput
+                  currency="UAH"
+                  value={clientPriceState[key]}
+                  onChange={(v) => handleClientPriceChange(key, v)}
+                />
+              </FormField>
+            ))}
           </div>
           <FormField label="Загальна сума для клієнта">
             <MoneyInput

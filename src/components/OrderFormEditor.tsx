@@ -5,8 +5,11 @@ import {
 } from './AcBrandModelFields'
 import { MoneyInput } from './MoneyInput'
 import {
-  applyClientTotal,
+  applyClientTotalFromValues,
   applySupplierUahFromUsd,
+  CLIENT_PAYMENT_FIELDS,
+  pickClientPriceStrings,
+  type ClientPriceFormKey,
   type OrderFormValues,
 } from '../lib/orderFormHelpers'
 import type { OrderStatus, PaymentStatus } from '../types/order'
@@ -32,22 +35,10 @@ export function OrderFormEditor({
 
   function recalcTotal(next: Partial<OrderFormValues>) {
     const merged = { ...values, ...next }
-    return applyClientTotal(
-      merged.acUnitPrice,
-      merged.installationPrice,
-      merged.dismantlingPrice,
-      merged.refillPrice,
-    )
+    return applyClientTotalFromValues(pickClientPriceStrings(merged))
   }
 
-  function handleClientPriceChange(
-    field:
-      | 'acUnitPrice'
-      | 'installationPrice'
-      | 'dismantlingPrice'
-      | 'refillPrice',
-    value: string,
-  ) {
+  function handleClientPriceChange(field: ClientPriceFormKey, value: string) {
     patch({
       [field]: value,
       salePrice: recalcTotal({ [field]: value }),
@@ -87,34 +78,15 @@ export function OrderFormEditor({
       <div className="space-y-4 rounded-lg border border-slate-200 p-4">
         <p className="text-sm font-medium text-slate-900">Оплата від клієнта</p>
         <div className="grid gap-4 sm:grid-cols-2">
-          <FormField label="Вартість кондиціонера">
-            <MoneyInput
-              currency="UAH"
-              value={values.acUnitPrice}
-              onChange={(v) => handleClientPriceChange('acUnitPrice', v)}
-            />
-          </FormField>
-          <FormField label="Вартість встановлення">
-            <MoneyInput
-              currency="UAH"
-              value={values.installationPrice}
-              onChange={(v) => handleClientPriceChange('installationPrice', v)}
-            />
-          </FormField>
-          <FormField label="Демонтаж">
-            <MoneyInput
-              currency="UAH"
-              value={values.dismantlingPrice}
-              onChange={(v) => handleClientPriceChange('dismantlingPrice', v)}
-            />
-          </FormField>
-          <FormField label="Заправка">
-            <MoneyInput
-              currency="UAH"
-              value={values.refillPrice}
-              onChange={(v) => handleClientPriceChange('refillPrice', v)}
-            />
-          </FormField>
+          {CLIENT_PAYMENT_FIELDS.map(({ key, label }) => (
+            <FormField key={key} label={label}>
+              <MoneyInput
+                currency="UAH"
+                value={values[key]}
+                onChange={(v) => handleClientPriceChange(key, v)}
+              />
+            </FormField>
+          ))}
         </div>
         <FormField label="Загальна сума для клієнта">
           <MoneyInput

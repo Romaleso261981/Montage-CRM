@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { OrdersListFiltersBar } from '../components/OrdersListFiltersBar'
 import { OrdersColumnsPicker } from '../components/OrdersColumnsPicker'
 import { inputClass } from '../components/AuthShell'
 import { OrdersTableOrderCell } from '../components/OrdersTableOrderCell'
@@ -10,6 +11,10 @@ import {
   getOrderRowHighlight,
   orderRowHighlightClasses,
 } from '../lib/orderDisplay'
+import {
+  filterOrdersByListFilters,
+  isOrdersListFiltersDefault,
+} from '../lib/orderListFilters'
 import { filterOrdersBySearch } from '../lib/orderSearch'
 import {
   clampPage,
@@ -36,7 +41,7 @@ export function OrdersPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [viewSettings, setViewSettings] = useState(loadOrdersTableViewSettings)
-  const { sortKey, sortDir, page } = viewSettings
+  const { sortKey, sortDir, page, filters } = viewSettings
   const visibleColumns = useMemo(
     () => visibleColumnsFromSettings(viewSettings),
     [viewSettings],
@@ -87,10 +92,14 @@ export function OrdersPage() {
     persistViewSettings({ page: nextPage })
   }
 
-  const filteredOrders = useMemo(
-    () => filterOrdersBySearch(orders, searchQuery),
-    [orders, searchQuery],
-  )
+  const filteredOrders = useMemo(() => {
+    const byFilters = filterOrdersByListFilters(orders, filters)
+    return filterOrdersBySearch(byFilters, searchQuery)
+  }, [orders, filters, searchQuery])
+
+  const hasSearch = searchQuery.trim().length > 0
+  const hasFilters = !isOrdersListFiltersDefault(filters)
+  const showResultCount = hasSearch || hasFilters
 
   const sortedOrders = useMemo(
     () => sortOrders(filteredOrders, sortKey, sortDir),
@@ -155,6 +164,12 @@ export function OrdersPage() {
 
       {!loading && orders.length > 0 && (
         <>
+          <OrdersListFiltersBar
+            filters={filters}
+            onChange={(next) =>
+              persistViewSettings({ filters: next, page: 1 })
+            }
+          />
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <label className="block max-w-md flex-1">
               <span className="text-sm font-medium text-slate-700">Пошук</span>
@@ -170,9 +185,9 @@ export function OrdersPage() {
                 autoComplete="off"
               />
             </label>
-            {searchQuery.trim() && (
+            {showResultCount && (
               <p className="text-sm text-slate-600">
-                Знайдено {filteredOrders.length} з {orders.length}
+                Показано {filteredOrders.length} з {orders.length}
               </p>
             )}
           </div>
@@ -186,7 +201,7 @@ export function OrdersPage() {
           </p>
           {sortedOrders.length === 0 ? (
             <p className="rounded-xl border border-slate-200 bg-white px-4 py-8 text-center text-slate-600">
-              За запитом «{searchQuery.trim()}» заявок не знайдено.
+              Немає заявок за обраними умовами (пошук і фільтри).
             </p>
           ) : (
           <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">

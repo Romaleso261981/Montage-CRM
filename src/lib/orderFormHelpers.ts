@@ -48,6 +48,9 @@ export type OrderFormValues = {
   installationPrice: string
   dismantlingPrice: string
   refillPrice: string
+  repairPrice: string
+  drainCleaningPrice: string
+  acCleaningPrice: string
   salePrice: string
   isMySale: boolean
   brandSelection: string
@@ -69,6 +72,44 @@ export type OrderFormValues = {
   installationTime: string
   installerName: string
   comment: string
+}
+
+export const CLIENT_PAYMENT_FIELDS = [
+  { key: 'acUnitPrice', label: 'Вартість кондиціонера' },
+  { key: 'installationPrice', label: 'Вартість встановлення' },
+  { key: 'dismantlingPrice', label: 'Демонтаж' },
+  { key: 'refillPrice', label: 'Заправка' },
+  { key: 'repairPrice', label: 'Ремонт' },
+  { key: 'drainCleaningPrice', label: 'Чистка дренажу' },
+  { key: 'acCleaningPrice', label: 'Чистка кондиціонера' },
+] as const satisfies ReadonlyArray<{
+  key: keyof Pick<
+    OrderFormValues,
+    | 'acUnitPrice'
+    | 'installationPrice'
+    | 'dismantlingPrice'
+    | 'refillPrice'
+    | 'repairPrice'
+    | 'drainCleaningPrice'
+    | 'acCleaningPrice'
+  >
+  label: string
+}>
+
+export type ClientPriceFormKey = (typeof CLIENT_PAYMENT_FIELDS)[number]['key']
+
+export function pickClientPriceStrings(
+  values: OrderFormValues,
+): Record<ClientPriceFormKey, string> {
+  return {
+    acUnitPrice: values.acUnitPrice,
+    installationPrice: values.installationPrice,
+    dismantlingPrice: values.dismantlingPrice,
+    refillPrice: values.refillPrice,
+    repairPrice: values.repairPrice,
+    drainCleaningPrice: values.drainCleaningPrice,
+    acCleaningPrice: values.acCleaningPrice,
+  }
 }
 
 export function orderToFormValues(order: Order): OrderFormValues {
@@ -95,6 +136,9 @@ export function orderToFormValues(order: Order): OrderFormValues {
     installationPrice: moneyFieldFromNumber(order.installationPrice),
     dismantlingPrice: moneyFieldFromNumber(order.dismantlingPrice),
     refillPrice: moneyFieldFromNumber(order.refillPrice),
+    repairPrice: moneyFieldFromNumber(order.repairPrice),
+    drainCleaningPrice: moneyFieldFromNumber(order.drainCleaningPrice),
+    acCleaningPrice: moneyFieldFromNumber(order.acCleaningPrice),
     salePrice: moneyFieldFromNumber(order.salePrice),
     isMySale: order.isMySale ?? false,
     ...brand,
@@ -144,6 +188,9 @@ export type ParsedOrderForm =
         installationPrice?: number
         dismantlingPrice?: number
         refillPrice?: number
+        repairPrice?: number
+        drainCleaningPrice?: number
+        acCleaningPrice?: number
         salePrice: number
         isMySale: boolean
         saleDetails?: OrderSaleDetails
@@ -162,15 +209,26 @@ export function parseOrderForm(values: OrderFormValues): ParsedOrderForm {
   const install = parseOptionalMoney(values.installationPrice)
   const dismantling = parseOptionalMoney(values.dismantlingPrice)
   const refill = parseOptionalMoney(values.refillPrice)
+  const repair = parseOptionalMoney(values.repairPrice)
+  const drainCleaning = parseOptionalMoney(values.drainCleaningPrice)
+  const acCleaning = parseOptionalMoney(values.acCleaningPrice)
 
-  const expectedTotal = sumClientLineItems(ac, install, dismantling, refill)
+  const expectedTotal = sumClientLineItems(
+    ac,
+    install,
+    dismantling,
+    refill,
+    repair,
+    drainCleaning,
+    acCleaning,
+  )
 
   const price = parseOptionalMoney(values.salePrice)
   if (price !== null && Math.abs(price - expectedTotal) > 0.02) {
     return {
       ok: false,
       error:
-        'Загальна сума має дорівнювати сумі заповнених позицій (кондиціонер, встановлення, демонтаж, заправка)',
+        'Загальна сума має дорівнювати сумі заповнених позицій оплати від клієнта',
     }
   }
 
@@ -252,6 +310,9 @@ export function parseOrderForm(values: OrderFormValues): ParsedOrderForm {
       installationPrice: install ?? undefined,
       dismantlingPrice: dismantling ?? undefined,
       refillPrice: refill ?? undefined,
+      repairPrice: repair ?? undefined,
+      drainCleaningPrice: drainCleaning ?? undefined,
+      acCleaningPrice: acCleaning ?? undefined,
       salePrice: expectedTotal,
       isMySale: values.isMySale,
       saleDetails: values.isMySale ? saleDetails : undefined,
@@ -265,27 +326,34 @@ export function parseOrderForm(values: OrderFormValues): ParsedOrderForm {
   }
 }
 
+export function applyClientTotalFromValues(
+  prices: Record<ClientPriceFormKey, string>,
+): string {
+  const parts = CLIENT_PAYMENT_FIELDS.map(({ key }) =>
+    parseOptionalMoney(prices[key]),
+  )
+  const total = sumClientLineItems(...parts)
+  const anyFilled = CLIENT_PAYMENT_FIELDS.some(({ key }) => prices[key].trim())
+  if (!anyFilled) return ''
+  return normalizeMoneyInput(String(total))
+}
+
+/** @deprecated use applyClientTotalFromValues */
 export function applyClientTotal(
   acStr: string,
   installStr: string,
   dismantlingStr: string,
   refillStr: string,
 ): string {
-  const total = sumClientLineItems(
-    parseOptionalMoney(acStr),
-    parseOptionalMoney(installStr),
-    parseOptionalMoney(dismantlingStr),
-    parseOptionalMoney(refillStr),
-  )
-  if (
-    !acStr.trim() &&
-    !installStr.trim() &&
-    !dismantlingStr.trim() &&
-    !refillStr.trim()
-  ) {
-    return ''
-  }
-  return normalizeMoneyInput(String(total))
+  return applyClientTotalFromValues({
+    acUnitPrice: acStr,
+    installationPrice: installStr,
+    dismantlingPrice: dismantlingStr,
+    refillPrice: refillStr,
+    repairPrice: '',
+    drainCleaningPrice: '',
+    acCleaningPrice: '',
+  })
 }
 
 export function applySupplierUahFromUsd(usdStr: string, rateStr: string): string {

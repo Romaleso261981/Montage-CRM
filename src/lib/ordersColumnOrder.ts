@@ -1,4 +1,9 @@
 import type { OrdersSortKey, SortDirection } from './ordersTableSort'
+import {
+  DEFAULT_ORDERS_LIST_FILTERS,
+  normalizeOrdersListFilters,
+  type OrdersListFilters,
+} from './orderListFilters'
 
 export const DEFAULT_ORDERS_COLUMN_ORDER: OrdersSortKey[] = [
   'client',
@@ -28,6 +33,7 @@ export type OrdersTableViewSettings = {
   sortKey: OrdersSortKey
   sortDir: SortDirection
   page: number
+  filters: OrdersListFilters
 }
 
 export const DEFAULT_ORDERS_TABLE_VIEW: OrdersTableViewSettings = {
@@ -36,6 +42,7 @@ export const DEFAULT_ORDERS_TABLE_VIEW: OrdersTableViewSettings = {
   sortKey: 'installation',
   sortDir: 'asc',
   page: 1,
+  filters: { ...DEFAULT_ORDERS_LIST_FILTERS },
 }
 
 /** @deprecated use OrdersTableViewSettings */
@@ -136,8 +143,11 @@ function normalizeViewSettings(
     partial.page >= 1
       ? Math.floor(partial.page)
       : DEFAULT_ORDERS_TABLE_VIEW.page
+  const filters = normalizeOrdersListFilters(
+    partial.filters as Partial<OrdersListFilters> | undefined,
+  )
 
-  return { order, hidden, sortKey, sortDir, page }
+  return { order, hidden, sortKey, sortDir, page, filters }
 }
 
 export function loadOrdersTableViewSettings(): OrdersTableViewSettings {
