@@ -90,12 +90,15 @@ export function OrderFormEditor({
         </div>
         <FormField label="Загальна сума для клієнта">
           <MoneyInput
-            readOnly
             currency="UAH"
             value={values.salePrice}
-            onChange={() => {}}
+            onChange={(v) => patch({ salePrice: v })}
             placeholder="сума заповнених позицій"
           />
+          <p className="mt-1 text-xs text-slate-500">
+            Можна вказати вручну; при зміні позицій вище сума перераховується
+            автоматично.
+          </p>
         </FormField>
       </div>
 
@@ -224,12 +227,11 @@ export function OrderFormEditor({
                   />
                 </FormField>
               </div>
-              <FormField label="Собівартість закупівлі">
+              <FormField label="Собівартість закупівлі (₴)">
                 <MoneyInput
-                  readOnly
                   currency="UAH"
                   value={values.supplierPaidAmount}
-                  onChange={() => {}}
+                  onChange={(v) => patch({ supplierPaidAmount: v })}
                 />
               </FormField>
             </>

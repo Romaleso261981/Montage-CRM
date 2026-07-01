@@ -224,13 +224,7 @@ export function parseOrderForm(values: OrderFormValues): ParsedOrderForm {
   )
 
   const price = parseOptionalMoney(values.salePrice)
-  if (price !== null && Math.abs(price - expectedTotal) > 0.02) {
-    return {
-      ok: false,
-      error:
-        'Загальна сума має дорівнювати сумі заповнених позицій оплати від клієнта',
-    }
-  }
+  const salePrice = price !== null ? price : expectedTotal
 
   let saleDetails: OrderSaleDetails | undefined
 
@@ -273,7 +267,8 @@ export function parseOrderForm(values: OrderFormValues): ParsedOrderForm {
       }
       paidUsd = usd
       paidRate = rate
-      paidUah = uahFromUsd(usd, rate)
+      const manualUah = parseOptionalMoney(values.supplierPaidAmount)
+      paidUah = manualUah ?? uahFromUsd(usd, rate)
     } else {
       const paid = parseRequiredMoney(values.supplierPaidAmount)
       if (paid === null) {
@@ -313,7 +308,7 @@ export function parseOrderForm(values: OrderFormValues): ParsedOrderForm {
       repairPrice: repair ?? undefined,
       drainCleaningPrice: drainCleaning ?? undefined,
       acCleaningPrice: acCleaning ?? undefined,
-      salePrice: expectedTotal,
+      salePrice,
       isMySale: values.isMySale,
       saleDetails: values.isMySale ? saleDetails : undefined,
       status: values.status,

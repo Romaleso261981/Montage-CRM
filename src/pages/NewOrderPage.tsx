@@ -198,10 +198,9 @@ export function NewOrderPage() {
           </div>
           <FormField label="Загальна сума для клієнта">
             <MoneyInput
-              readOnly
               currency="UAH"
               value={salePrice}
-              onChange={() => {}}
+              onChange={setSalePrice}
               placeholder="сума заповнених позицій"
             />
           </FormField>
@@ -328,12 +327,11 @@ export function NewOrderPage() {
                     />
                   </FormField>
                 </div>
-                <FormField label="Собівартість закупівлі — розрахунок">
+                <FormField label="Собівартість закупівлі (₴)">
                   <MoneyInput
-                    readOnly
                     currency="UAH"
                     value={supplierPaidAmount}
-                    onChange={() => {}}
+                    onChange={setSupplierPaidAmount}
                     placeholder="USD × курс"
                   />
                 </FormField>

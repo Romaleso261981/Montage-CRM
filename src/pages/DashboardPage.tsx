@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { InstallationCalendar } from '../components/InstallationCalendar'
 import { useAuth } from '../context/useAuth'
 import { ORDER_STATUS_LABELS } from '../constants/orderLabels'
 import { getOrdersByOrganizationId } from '../services/ordersService'
@@ -39,9 +40,11 @@ export function DashboardPage() {
       </div>
 
       {loading ? (
-        <p className="text-slate-500">Завантаження статистики…</p>
+        <p className="text-slate-500">Завантаження…</p>
       ) : (
         <>
+          <InstallationCalendar orders={orders} />
+
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {[
               { label: 'Усього заявок', value: stats.total },
@@ -70,7 +73,12 @@ export function DashboardPage() {
                     key={order.id}
                     className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm"
                   >
-                    <span className="font-medium">{order.clientName}</span>
+                    <Link
+                      to={`/orders/${order.id}`}
+                      className="font-medium text-slate-900 hover:underline"
+                    >
+                      {order.clientName}
+                    </Link>
                     <span className="text-slate-500">
                       {ORDER_STATUS_LABELS[order.status]}
                     </span>
