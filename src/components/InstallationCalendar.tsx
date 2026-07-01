@@ -1,14 +1,10 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { ORDER_STATUS_LABELS } from '../constants/orderLabels'
+import { InstallationDayDetailsPanel } from './InstallationDayDetailsPanel'
 import {
   buildInstallationMap,
-  formatDayTitleUk,
   formatMonthYearUk,
   getMonthCalendarCells,
-  installationCalendarTone,
   localDateKey,
-  type DayInstallationStats,
 } from '../lib/installationCalendar'
 import type { Order } from '../types/order'
 
@@ -16,18 +12,6 @@ const WEEKDAYS_UK = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд']
 
 type InstallationCalendarProps = {
   orders: Order[]
-}
-
-function toneLabel(tone: 'completed' | 'upcoming' | 'overdue'): string {
-  if (tone === 'completed') return 'Встановлено'
-  if (tone === 'upcoming') return 'Заплановано'
-  return 'Прострочено'
-}
-
-function toneRowClass(tone: 'completed' | 'upcoming' | 'overdue'): string {
-  if (tone === 'completed') return 'border-green-200 bg-green-50'
-  if (tone === 'upcoming') return 'border-sky-200 bg-sky-50'
-  return 'border-orange-200 bg-orange-50'
 }
 
 export function InstallationCalendar({ orders }: InstallationCalendarProps) {
@@ -54,7 +38,7 @@ export function InstallationCalendar({ orders }: InstallationCalendarProps) {
     setViewMonth(d.getMonth())
   }
 
-  const selectedStats: DayInstallationStats | undefined = selectedKey
+  const selectedStats = selectedKey
     ? installationMap.get(selectedKey)
     : undefined
 
@@ -169,48 +153,11 @@ export function InstallationCalendar({ orders }: InstallationCalendarProps) {
         })}
       </div>
 
-      <div className="mt-6 border-t border-slate-100 pt-4">
-        <h3 className="text-sm font-semibold text-slate-900">
-          {selectedKey ? formatDayTitleUk(selectedKey) : 'Оберіть день'}
-        </h3>
-        {!selectedStats || selectedStats.orders.length === 0 ? (
-          <p className="mt-2 text-sm text-slate-500">
-            На цей день монтажів не заплановано.
-          </p>
-        ) : (
-          <ul className="mt-3 space-y-2">
-            {selectedStats.orders.map((order) => {
-              const tone = installationCalendarTone(order, todayKey)
-              if (!tone) return null
-              return (
-                <li key={order.id}>
-                  <Link
-                    to={`/orders/${order.id}`}
-                    className={`flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm hover:opacity-90 ${toneRowClass(tone)}`}
-                  >
-                    <span>
-                      <span className="font-medium text-slate-900">
-                        {order.clientName}
-                      </span>
-                      {order.installationTime && (
-                        <span className="ml-2 text-slate-600">
-                          {order.installationTime}
-                        </span>
-                      )}
-                      <span className="mt-0.5 block text-xs text-slate-500">
-                        {order.address}
-                      </span>
-                    </span>
-                    <span className="text-xs font-medium text-slate-600">
-                      {toneLabel(tone)} · {ORDER_STATUS_LABELS[order.status]}
-                    </span>
-                  </Link>
-                </li>
-              )
-            })}
-          </ul>
-        )}
-      </div>
+      <InstallationDayDetailsPanel
+        selectedKey={selectedKey}
+        stats={selectedStats}
+        todayKey={todayKey}
+      />
     </section>
   )
 }
