@@ -31,8 +31,8 @@ export function InstallationDayExtractActions({
           disabled={disabled}
           onClick={() => openInstallationExtractPrint(dateKey, orders)}
           className={`${baseBtn} px-2.5 py-2`}
-          title="Виписка — друк або PDF"
-          aria-label="Виписка — друк або PDF"
+          title="Друк або зберегти як PDF"
+          aria-label="Друк або зберегти як PDF"
         >
           PDF
         </button>

@@ -169,23 +169,66 @@ function buildPrintDocumentHtml(dateKey: string, rows: InstallationExtractRow[])
 </html>`
 }
 
+const PRINT_FRAME_ID = 'montage-crm-extract-print-frame'
+
+function getOrCreatePrintFrame(): HTMLIFrameElement {
+  let frame = document.getElementById(PRINT_FRAME_ID) as HTMLIFrameElement | null
+  if (frame) return frame
+
+  frame = document.createElement('iframe')
+  frame.id = PRINT_FRAME_ID
+  frame.setAttribute('title', 'Друк виписки')
+  frame.setAttribute('aria-hidden', 'true')
+  frame.style.cssText =
+    'position:fixed;left:0;top:0;width:100%;height:100%;border:0;opacity:0;pointer-events:none;z-index:-1;'
+  document.body.appendChild(frame)
+  return frame
+}
+
+function downloadInstallationExtractHtml(dateKey: string, html: string): void {
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `vypyska-montazhiv-${dateKey}.html`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+/** Друк / «Зберегти як PDF» без нового вікна (обхід блокування pop-up). */
 export function openInstallationExtractPrint(dateKey: string, orders: Order[]): void {
   if (orders.length === 0) return
   const rows = buildInstallationExtractRows(orders)
   const html = buildPrintDocumentHtml(dateKey, rows)
-  const win = window.open('', '_blank', 'noopener,noreferrer')
-  if (!win) {
-    window.alert('Дозвольте спливаючі вікна, щоб відкрити виписку для друку або PDF.')
+
+  const frame = getOrCreatePrintFrame()
+  const win = frame.contentWindow
+  const doc = win?.document
+
+  if (!win || !doc) {
+    downloadInstallationExtractHtml(dateKey, html)
     return
   }
-  win.document.open()
-  win.document.write(html)
-  win.document.close()
-  win.focus()
-  win.onload = () => {
-    win.print()
+
+  doc.open()
+  doc.write(html)
+  doc.close()
+
+  const runPrint = () => {
+    try {
+      win.focus()
+      win.print()
+    } catch {
+      downloadInstallationExtractHtml(dateKey, html)
+    }
   }
-  setTimeout(() => win.print(), 300)
+
+  if (doc.readyState === 'complete') {
+    requestAnimationFrame(() => setTimeout(runPrint, 50))
+  } else {
+    frame.onload = () => runPrint()
+    setTimeout(runPrint, 400)
+  }
 }
 
 function buildPlainTextExtract(dateKey: string, rows: InstallationExtractRow[]): string {
