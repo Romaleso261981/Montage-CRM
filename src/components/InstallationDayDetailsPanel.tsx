@@ -20,6 +20,15 @@ type InstallationDayDetailsPanelProps = {
   selectedKey: string | null
   stats: DayInstallationStats | undefined
   todayKey: string
+  /** Прокрутка до панелі після вибору дня (десктоп). */
+  scrollOnSelect?: boolean
+  /** Показувати підказку, коли день не обрано. */
+  showEmptyHint?: boolean
+  /** Заголовок «Монтажі: …» (у модалці вже є дата зверху). */
+  showTitle?: boolean
+  /** Картки замість таблиці (мобільна модалка). */
+  layout?: 'table' | 'cards'
+  className?: string
 }
 
 function toneBadgeClass(tone: 'completed' | 'upcoming' | 'overdue'): string {
@@ -38,15 +47,20 @@ export function InstallationDayDetailsPanel({
   selectedKey,
   stats,
   todayKey,
+  scrollOnSelect = true,
+  showEmptyHint = true,
+  showTitle = true,
+  className = '',
 }: InstallationDayDetailsPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (!selectedKey || !panelRef.current) return
+    if (!scrollOnSelect || !selectedKey || !panelRef.current) return
     panelRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-  }, [selectedKey, stats?.orders.length])
+  }, [scrollOnSelect, selectedKey, stats?.orders.length])
 
   if (!selectedKey) {
+    if (!showEmptyHint) return null
     return (
       <p className="mt-4 text-sm text-slate-500">
         Натисніть на дату в календарі, щоб побачити монтажі.
@@ -60,12 +74,16 @@ export function InstallationDayDetailsPanel({
   return (
     <div
       ref={panelRef}
-      className="mt-6 rounded-xl border border-slate-200 bg-slate-50/50 p-4"
+      className={`rounded-xl border border-slate-200 bg-slate-50/50 p-4 ${className}`}
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className="text-base font-semibold capitalize text-slate-900">
-          Монтажі: {title}
-        </h3>
+        {showTitle ? (
+          <h3 className="text-base font-semibold capitalize text-slate-900">
+            Монтажі: {title}
+          </h3>
+        ) : (
+          <span className="sr-only">{title}</span>
+        )}
         {count > 0 && (
           <span className="text-sm text-slate-600">
             {count}{' '}

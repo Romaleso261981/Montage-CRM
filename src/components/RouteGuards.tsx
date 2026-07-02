@@ -1,8 +1,10 @@
 import { Navigate, Outlet } from 'react-router-dom'
+import { ProfileLoadErrorScreen } from './ProfileLoadErrorScreen'
 import { useAuth } from '../context/useAuth'
 
 export function ProtectedRoute() {
-  const { firebaseUser, appUser, loading } = useAuth()
+  const { firebaseUser, appUser, loading, profileError, profileRetrying, refreshProfile } =
+    useAuth()
 
   if (loading) {
     return (
@@ -14,6 +16,16 @@ export function ProtectedRoute() {
 
   if (!firebaseUser) {
     return <Navigate to="/login" replace />
+  }
+
+  if (profileError) {
+    return (
+      <ProfileLoadErrorScreen
+        message={profileError}
+        onRetry={refreshProfile}
+        retrying={profileRetrying}
+      />
+    )
   }
 
   if (!appUser) {
@@ -28,7 +40,8 @@ export function ProtectedRoute() {
 }
 
 export function OnboardingRoute() {
-  const { firebaseUser, appUser, loading } = useAuth()
+  const { firebaseUser, appUser, loading, profileError, profileRetrying, refreshProfile } =
+    useAuth()
 
   if (loading) {
     return (
@@ -40,6 +53,16 @@ export function OnboardingRoute() {
 
   if (!firebaseUser) {
     return <Navigate to="/login" replace />
+  }
+
+  if (profileError) {
+    return (
+      <ProfileLoadErrorScreen
+        message={profileError}
+        onRetry={refreshProfile}
+        retrying={profileRetrying}
+      />
+    )
   }
 
   if (appUser) {

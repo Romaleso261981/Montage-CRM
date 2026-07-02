@@ -1,5 +1,9 @@
 import { initializeApp } from 'firebase/app'
-import { getAuth } from 'firebase/auth'
+import {
+  browserLocalPersistence,
+  getAuth,
+  setPersistence,
+} from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
 
 const firebaseConfig = {
@@ -27,4 +31,8 @@ if (import.meta.env.DEV) {
 const app = initializeApp(firebaseConfig)
 
 export const auth = getAuth(app)
+void setPersistence(auth, browserLocalPersistence).catch(() => {
+  // ignore — Safari private mode тощо
+})
+
 export const db = getFirestore(app)

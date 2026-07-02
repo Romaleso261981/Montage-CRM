@@ -8,6 +8,8 @@ export type AuthContextValue = {
   appUser: AppUser | null
   organization: Organization | null
   loading: boolean
+  profileError: string | null
+  profileRetrying: boolean
   register: (email: string, password: string) => Promise<User>
   login: (email: string, password: string) => Promise<User>
   logout: () => Promise<void>
