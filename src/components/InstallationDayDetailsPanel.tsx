@@ -50,6 +50,7 @@ export function InstallationDayDetailsPanel({
   scrollOnSelect = true,
   showEmptyHint = true,
   showTitle = true,
+  layout = 'table',
   className = '',
 }: InstallationDayDetailsPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null)
@@ -84,7 +85,7 @@ export function InstallationDayDetailsPanel({
         ) : (
           <span className="sr-only">{title}</span>
         )}
-        {count > 0 && (
+        {count > 0 && layout === 'table' && (
           <span className="text-sm text-slate-600">
             {count}{' '}
             {count === 1 ? 'заявка' : count < 5 ? 'заявки' : 'заявок'}
@@ -93,9 +94,19 @@ export function InstallationDayDetailsPanel({
       </div>
 
       {count === 0 ? (
-        <p className="mt-3 text-sm text-slate-500">
+        <p className={`text-sm text-slate-500 ${layout === 'table' ? 'mt-3' : ''}`}>
           На цей день монтажів не заплановано.
         </p>
+      ) : layout === 'cards' ? (
+        <ul className={`flex flex-col gap-3 ${showTitle ? 'mt-4' : ''}`}>
+          {stats!.orders.map((order) => (
+            <InstallationDayCard
+              key={order.id}
+              order={order}
+              todayKey={todayKey}
+            />
+          ))}
+        </ul>
       ) : (
         <div className="mt-4 overflow-x-auto rounded-lg border border-slate-200 bg-white">
           <table className="min-w-full text-left text-sm">
@@ -126,6 +137,84 @@ export function InstallationDayDetailsPanel({
         </div>
       )}
     </div>
+  )
+}
+
+function InstallationDayCard({
+  order,
+  todayKey,
+}: {
+  order: Order
+  todayKey: string
+}) {
+  const tone = installationCalendarTone(order, todayKey)
+  if (!tone) return null
+
+  const time = order.installationTime?.trim()
+  const address = order.address?.trim()
+
+  return (
+    <li className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-semibold text-slate-900">{order.clientName}</p>
+          {(time || address) && (
+            <p className="mt-1 text-sm text-slate-600">
+              {[time, address].filter(Boolean).join(' · ')}
+            </p>
+          )}
+        </div>
+        <span
+          className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${toneBadgeClass(tone)}`}
+        >
+          {toneLabel(tone)}
+        </span>
+      </div>
+
+      <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 text-sm">
+        <dt className="text-slate-500">Телефон</dt>
+        <dd>
+          <a
+            href={`tel:${order.phone.replace(/\s/g, '')}`}
+            className="font-medium text-slate-900 underline-offset-2 hover:underline"
+          >
+            {order.phone}
+          </a>
+        </dd>
+        <dt className="text-slate-500">Сума</dt>
+        <dd className="font-medium text-slate-900">
+          {formatMoneyDisplay(order.salePrice, 'UAH')}
+        </dd>
+        <dt className="text-slate-500">До сплати</dt>
+        <dd>
+          {order.paymentStatus === 'paid' ? (
+            <span className="text-slate-500">Оплачено</span>
+          ) : (
+            <span className="font-medium text-slate-900">
+              {formatClientAmountDue(order)}
+            </span>
+          )}
+        </dd>
+        {order.installerName?.trim() && (
+          <>
+            <dt className="text-slate-500">Монтажник</dt>
+            <dd className="text-slate-800">{order.installerName.trim()}</dd>
+          </>
+        )}
+        <dt className="text-slate-500">Статус</dt>
+        <dd className="text-slate-700">
+          {ORDER_STATUS_LABELS[order.status]} ·{' '}
+          {PAYMENT_STATUS_LABELS[order.paymentStatus]}
+        </dd>
+      </dl>
+
+      <Link
+        to={`/orders/${order.id}`}
+        className="mt-4 flex w-full items-center justify-center rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-slate-800"
+      >
+        Відкрити заявку
+      </Link>
+    </li>
   )
 }
 
