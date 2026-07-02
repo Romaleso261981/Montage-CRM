@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react'
 import { InstallationCalendarDayChip } from './InstallationCalendarDayChip'
-import { InstallationDayDetailsPanel } from './InstallationDayDetailsPanel'
 import { InstallationDayModal } from './InstallationDayModal'
 import {
   buildInstallationMap,
@@ -13,7 +12,6 @@ import type { Order } from '../types/order'
 
 const WEEKDAYS_UK = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд']
 const MAX_CHIPS_PER_DAY = 3
-const MOBILE_MAX_WIDTH = '(max-width: 767px)'
 
 function installationCountLabel(count: number): string {
   if (count === 1) return '1 монт.'
@@ -36,9 +34,7 @@ export function InstallationCalendar({ orders }: InstallationCalendarProps) {
 
   function handleDayClick(dateKey: string) {
     setSelectedKey(dateKey)
-    if (window.matchMedia(MOBILE_MAX_WIDTH).matches) {
-      setDayModalOpen(true)
-    }
+    setDayModalOpen(true)
   }
 
   const installationMap = useMemo(
@@ -169,14 +165,6 @@ export function InstallationCalendar({ orders }: InstallationCalendarProps) {
             </button>
           )
         })}
-      </div>
-
-      <div className="mt-6 hidden md:block">
-        <InstallationDayDetailsPanel
-          selectedKey={selectedKey}
-          stats={selectedStats}
-          todayKey={todayKey}
-        />
       </div>
 
       <InstallationDayModal

@@ -60,13 +60,13 @@ export function InstallationDayModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex flex-col bg-slate-50 md:hidden"
+      className="fixed inset-0 z-50 flex flex-col bg-slate-50"
       role="dialog"
       aria-modal="true"
       aria-labelledby="installation-day-modal-title"
     >
       <header className="shrink-0 border-b border-slate-200 bg-white pt-[env(safe-area-inset-top)]">
-        <div className="flex items-center gap-2 px-3 py-3">
+        <div className="mx-auto flex w-full max-w-5xl items-center gap-2 px-3 py-3 md:px-6 md:py-4">
           <button
             type="button"
             onClick={onClose}
@@ -92,12 +92,19 @@ export function InstallationDayModal({
           <InstallationDayExtractActions
             dateKey={selectedKey}
             orders={stats?.orders ?? []}
+            className="hidden shrink-0 sm:flex"
+          />
+          <InstallationDayExtractActions
+            dateKey={selectedKey}
+            orders={stats?.orders ?? []}
             compact
+            className="shrink-0 sm:hidden"
           />
         </div>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:px-6 md:py-6">
+        <div className="mx-auto w-full max-w-5xl">
         <InstallationDayDetailsPanel
           selectedKey={selectedKey}
           stats={stats}
@@ -109,6 +116,7 @@ export function InstallationDayModal({
           showExtractActions={false}
           className="border-0 bg-transparent p-0"
         />
+        </div>
       </div>
     </div>
   )
