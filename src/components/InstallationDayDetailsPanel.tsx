@@ -14,6 +14,7 @@ import {
   installationCalendarTone,
   type DayInstallationStats,
 } from '../lib/installationCalendar'
+import { InstallationDayExtractActions } from './InstallationDayExtractActions'
 import type { Order } from '../types/order'
 
 type InstallationDayDetailsPanelProps = {
@@ -28,6 +29,7 @@ type InstallationDayDetailsPanelProps = {
   showTitle?: boolean
   /** Картки замість таблиці (мобільна модалка). */
   layout?: 'table' | 'cards'
+  showExtractActions?: boolean
   className?: string
 }
 
@@ -51,6 +53,7 @@ export function InstallationDayDetailsPanel({
   showEmptyHint = true,
   showTitle = true,
   layout = 'table',
+  showExtractActions,
   className = '',
 }: InstallationDayDetailsPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null)
@@ -71,25 +74,35 @@ export function InstallationDayDetailsPanel({
 
   const title = formatDayTitleUk(selectedKey)
   const count = stats?.orders.length ?? 0
+  const extractVisible =
+    count > 0 && (showExtractActions ?? layout === 'table')
 
   return (
     <div
       ref={panelRef}
       className={`rounded-xl border border-slate-200 bg-slate-50/50 p-4 ${className}`}
     >
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        {showTitle ? (
-          <h3 className="text-base font-semibold capitalize text-slate-900">
-            Монтажі: {title}
-          </h3>
-        ) : (
-          <span className="sr-only">{title}</span>
-        )}
-        {count > 0 && layout === 'table' && (
-          <span className="text-sm text-slate-600">
-            {count}{' '}
-            {count === 1 ? 'заявка' : count < 5 ? 'заявки' : 'заявок'}
-          </span>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-baseline gap-2">
+          {showTitle ? (
+            <h3 className="text-base font-semibold capitalize text-slate-900">
+              Монтажі: {title}
+            </h3>
+          ) : (
+            <span className="sr-only">{title}</span>
+          )}
+          {count > 0 && layout === 'table' && (
+            <span className="text-sm text-slate-600">
+              {count}{' '}
+              {count === 1 ? 'заявка' : count < 5 ? 'заявки' : 'заявок'}
+            </span>
+          )}
+        </div>
+        {extractVisible && (
+          <InstallationDayExtractActions
+            dateKey={selectedKey}
+            orders={stats?.orders ?? []}
+          />
         )}
       </div>
 

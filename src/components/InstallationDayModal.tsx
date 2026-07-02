@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { InstallationDayDetailsPanel } from './InstallationDayDetailsPanel'
+import { InstallationDayExtractActions } from './InstallationDayExtractActions'
 import { formatDayTitleUk, type DayInstallationStats } from '../lib/installationCalendar'
 
 type InstallationDayModalProps = {
@@ -88,6 +89,11 @@ export function InstallationDayModal({
               </p>
             )}
           </div>
+          <InstallationDayExtractActions
+            dateKey={selectedKey}
+            orders={stats?.orders ?? []}
+            compact
+          />
         </div>
       </header>
 
@@ -100,6 +106,7 @@ export function InstallationDayModal({
           showEmptyHint={false}
           showTitle={false}
           layout="cards"
+          showExtractActions={false}
           className="border-0 bg-transparent p-0"
         />
       </div>
